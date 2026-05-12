@@ -42,9 +42,27 @@ export interface Contract {
   customer_id: number;
   customer?: Customer;
   total_amount?: number | string;
-  total_amount_after_tax?: number | string;
-  status?: string;
+  // Backend truth field: total_value_after_tax. Older callers still read
+  // total_amount_after_tax; keep both nullable for safety.
+  total_value_after_tax?: number | string | null;
+  total_amount_after_tax?: number | string | null;
+  total_invoiced?: number | string;
+  total_paid?: number | string;
+  remaining_amount?: number | string;
+  progress?: number;
+  signed_date?: string | null;
+  expiry_date?: string | null;
+  status?: 'draft' | 'active' | 'completed' | 'terminated' | string;
+  notes?: string | null;
+  project_manager_id?: number | null;
+  project_manager?: { id: number; name: string; email?: string | null } | null;
+  revenue_center_id?: number | null;
+  revenue_center?: { id: number; code: string; name: string } | null;
   installments?: PaymentInstallment[];
+  installments_count?: number;
+  documents_count?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PaymentInstallment {
@@ -54,7 +72,10 @@ export interface PaymentInstallment {
   name?: string | null;
   amount: number | string;
   due_date?: string | null;
-  status?: string;
+  status?: 'planned' | 'scheduled' | 'invoiced' | 'paid' | string;
+  invoiced_amount?: number | string;
+  paid_amount?: number | string;
+  notes?: string | null;
 }
 
 function buildList<T>(raw: unknown): Paginated<T> {

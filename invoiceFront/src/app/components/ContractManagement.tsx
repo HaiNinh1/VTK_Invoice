@@ -11,6 +11,9 @@ import {
   TrendingUp,
   Building,
   Loader2,
+  Pencil,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Dialog,
@@ -26,8 +29,15 @@ import {
   useContract,
   useContractInstallments,
   useCreateInvoiceFromInstallment,
+  useDeleteContract,
+  useDeleteInstallment,
 } from '../../lib/api/queries';
 import type { Contract, PaymentInstallment } from '../../lib/api/endpoints/masters';
+import { useAuth } from '../../lib/auth/AuthProvider';
+import { ApiError } from '../../lib/api/errors';
+import ContractFormModal from './contracts/ContractFormModal';
+import InstallmentFormModal from './contracts/InstallmentFormModal';
+import ContractDocumentsSection from './contracts/ContractDocumentsSection';
 
 interface ContractManagementProps {
   userRole?: 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
@@ -51,8 +61,11 @@ function formatBillion(n: number): string {
   return (n / 1_000_000_000).toFixed(1);
 }
 
-function formatMillion(n: number): string {
-  return (n / 1_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 0 });
+// Read total-after-VAT defensively: backend canonical field is
+// `total_value_after_tax`; the older `total_amount_after_tax` reads used to
+// return 0 because the backend never sent it. Keep the fallback for safety.
+function totalAfterVat(c: Contract): number {
+  return toNumber(c.total_value_after_tax ?? c.total_amount_after_tax ?? c.total_amount);
 }
 
 function statusBadge(status?: string) {
@@ -74,12 +87,16 @@ function statusBadge(status?: string) {
 }
 
 function installmentStatusBadge(status?: string) {
+  // Backend canonical statuses: planned | scheduled | invoiced | paid.
+  // `pending` is kept as a legacy display fallback for any old rows.
   const map: Record<string, { Icon: typeof Clock; bg: string; text: string; label: string }> = {
+    planned: { Icon: Clock, bg: '#FEF3C7', text: '#92400E', label: 'Đã lập kế hoạch' },
+    scheduled: { Icon: Calendar, bg: '#FEF3C7', text: '#92400E', label: 'Đã lên lịch' },
     pending: { Icon: Clock, bg: '#FEF3C7', text: '#92400E', label: 'Chưa xuất HĐ' },
     invoiced: { Icon: FileText, bg: '#DBEAFE', text: '#1E40AF', label: 'Đã xuất HĐ' },
     paid: { Icon: CheckCircle, bg: '#D1FAE5', text: '#065F46', label: 'Đã thanh toán' },
   };
-  const s = map[status ?? ''] ?? map.pending;
+  const s = map[status ?? ''] ?? map.planned;
   const Icon = s.Icon;
   return (
     <span
@@ -92,12 +109,37 @@ function installmentStatusBadge(status?: string) {
   );
 }
 
+// Installments not yet invoiced/paid can have an invoice request created.
+function canCreateInvoiceFromInstallment(status?: string): boolean {
+  return status === 'planned' || status === 'scheduled' || status === 'pending';
+}
+
 export default function ContractManagement({ onCreateInvoiceFromContract }: ContractManagementProps) {
+  const { hasRole, hasPermission } = useAuth();
+  const canManageContracts = hasRole(['admin']) || hasPermission('contract.manage');
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState<number | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Contract form modal (create + edit).
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [editingContract, setEditingContract] = useState<Contract | null>(null);
+
+  // Installment form modal (create + edit).
+  const [showInstallmentModal, setShowInstallmentModal] = useState(false);
+  const [installmentMode, setInstallmentMode] = useState<'create' | 'edit'>('create');
+  const [editingInstallment, setEditingInstallment] = useState<PaymentInstallment | null>(null);
+
+  // Delete confirmation (separate dialog because backend may 409).
+  const [deleteTarget, setDeleteTarget] = useState<
+    | { kind: 'contract'; contract: Contract }
+    | { kind: 'installment'; contractId: number; installment: PaymentInstallment }
+    | null
+  >(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Server-side filtering for status (backend supports `status` param) +
   // server-side search (`search` param). Role-based visibility is enforced
@@ -114,7 +156,7 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
   const stats = useMemo(() => {
     const totalContracts = contracts.length;
     const activeContracts = contracts.filter((c) => c.status === 'active').length;
-    const totalValue = contracts.reduce((sum, c) => sum + toNumber(c.total_amount_after_tax ?? c.total_amount), 0);
+    const totalValue = contracts.reduce((sum, c) => sum + totalAfterVat(c), 0);
     return { totalContracts, activeContracts, totalValue };
   }, [contracts]);
 
@@ -125,6 +167,8 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
   const installments: PaymentInstallment[] = installmentsQuery.data ?? selectedContract?.installments ?? [];
 
   const createInvoiceMut = useCreateInvoiceFromInstallment();
+  const deleteContractMut = useDeleteContract();
+  const deleteInstallmentMut = useDeleteInstallment(selectedContractId ?? 0);
 
   const handleViewDetail = (contract: Contract) => {
     setSelectedContractId(contract.id);
@@ -147,6 +191,51 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
     }
   };
 
+  const openCreateContract = () => {
+    setFormMode('create');
+    setEditingContract(null);
+    setShowFormModal(true);
+  };
+
+  const openEditContract = (c: Contract) => {
+    setFormMode('edit');
+    setEditingContract(c);
+    setShowFormModal(true);
+  };
+
+  const openCreateInstallment = () => {
+    setInstallmentMode('create');
+    setEditingInstallment(null);
+    setShowInstallmentModal(true);
+  };
+
+  const openEditInstallment = (i: PaymentInstallment) => {
+    setInstallmentMode('edit');
+    setEditingInstallment(i);
+    setShowInstallmentModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteError(null);
+    try {
+      if (deleteTarget.kind === 'contract') {
+        await deleteContractMut.mutateAsync(deleteTarget.contract.id);
+        // Close detail modal if we just deleted the contract that's open.
+        if (selectedContractId === deleteTarget.contract.id) {
+          setShowDetailModal(false);
+          setSelectedContractId(null);
+        }
+      } else {
+        await deleteInstallmentMut.mutateAsync(deleteTarget.installment.id);
+      }
+      setDeleteTarget(null);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Xoá thất bại';
+      setDeleteError(msg);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -155,13 +244,15 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
           <h1 className="text-2xl font-semibold text-[#111827]">Quản lý Hợp đồng</h1>
           <p className="text-sm text-[#6B7280] mt-1">Quản lý hợp đồng và thanh toán theo đợt</p>
         </div>
-        <Button
-          onClick={() => setShowCreateModal(true)}
-          className="h-10 px-4 bg-[#EE0033] text-white hover:bg-[#CC0029]"
-        >
-          <Plus size={16} className="mr-2" />
-          Tạo hợp đồng mới
-        </Button>
+        {canManageContracts && (
+          <Button
+            onClick={openCreateContract}
+            className="h-10 px-4 bg-[#EE0033] text-white hover:bg-[#CC0029]"
+          >
+            <Plus size={16} className="mr-2" />
+            Tạo hợp đồng mới
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -246,7 +337,7 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
       {!listQuery.isLoading && !listQuery.isError && (
         <div className="grid grid-cols-1 gap-4">
           {contracts.map((contract) => {
-            const totalValue = toNumber(contract.total_amount_after_tax ?? contract.total_amount);
+            const totalValue = totalAfterVat(contract);
             return (
               <div
                 key={contract.id}
@@ -275,9 +366,36 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs text-[#6B7280] mb-1">Tổng giá trị</div>
-                    <div className="text-xl font-bold text-[#EE0033]">{formatVND(totalValue)}đ</div>
+                  <div className="text-right flex flex-col items-end gap-2">
+                    <div>
+                      <div className="text-xs text-[#6B7280] mb-1">Tổng giá trị</div>
+                      <div className="text-xl font-bold text-[#EE0033]">{formatVND(totalValue)}đ</div>
+                    </div>
+                    {canManageContracts && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditContract(contract);
+                          }}
+                          className="h-8 px-2 text-xs"
+                        >
+                          <Pencil size={14} />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteError(null);
+                            setDeleteTarget({ kind: 'contract', contract });
+                          }}
+                          className="h-8 px-2 text-xs text-[#991B1B] border-[#FECACA] hover:bg-[#FEF2F2]"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -312,9 +430,34 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
 
           {selectedContract && (
             <div className="space-y-6 py-4">
-              {/* Basic Info */}
+              {/* Basic Info + actions */}
               <div className="bg-[#F9FAFB] rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-[#111827] mb-3">Thông tin hợp đồng</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-[#111827]">Thông tin hợp đồng</h3>
+                  {canManageContracts && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => openEditContract(selectedContract)}
+                        className="h-8 px-3 text-xs"
+                      >
+                        <Pencil size={14} className="mr-1" />
+                        Sửa
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget({ kind: 'contract', contract: selectedContract });
+                        }}
+                        className="h-8 px-3 text-xs text-[#991B1B] border-[#FECACA] hover:bg-[#FEF2F2]"
+                      >
+                        <Trash2 size={14} className="mr-1" />
+                        Xoá
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <div className="text-[#6B7280] mb-1">Mã hợp đồng</div>
@@ -345,17 +488,49 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
                   <div>
                     <div className="text-[#6B7280] mb-1">Tổng giá trị (sau VAT)</div>
                     <div className="font-bold text-[#EE0033]">
-                      {formatVND(toNumber(selectedContract.total_amount_after_tax))}đ
+                      {formatVND(totalAfterVat(selectedContract))}đ
                     </div>
                   </div>
+                  {selectedContract.signed_date && (
+                    <div>
+                      <div className="text-[#6B7280] mb-1">Ngày ký</div>
+                      <div className="font-medium text-[#111827]">{selectedContract.signed_date}</div>
+                    </div>
+                  )}
+                  {selectedContract.expiry_date && (
+                    <div>
+                      <div className="text-[#6B7280] mb-1">Ngày hết hạn</div>
+                      <div className="font-medium text-[#111827]">{selectedContract.expiry_date}</div>
+                    </div>
+                  )}
+                  {selectedContract.notes && (
+                    <div className="col-span-3">
+                      <div className="text-[#6B7280] mb-1">Ghi chú</div>
+                      <div className="font-medium text-[#111827] whitespace-pre-wrap">
+                        {selectedContract.notes}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Installments */}
               <div>
-                <h3 className="text-sm font-semibold text-[#111827] mb-3">
-                  Các đợt thanh toán ({installments.length})
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-[#111827]">
+                    Các đợt thanh toán ({installments.length})
+                  </h3>
+                  {canManageContracts && (
+                    <Button
+                      variant="outline"
+                      onClick={openCreateInstallment}
+                      className="h-8 px-3 text-xs"
+                    >
+                      <Plus size={14} className="mr-1" />
+                      Thêm đợt
+                    </Button>
+                  )}
+                </div>
 
                 {installmentsQuery.isLoading && (
                   <div className="py-6 flex items-center justify-center gap-2 text-[#6B7280]">
@@ -397,24 +572,61 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
                           <div className="text-lg font-bold text-[#EE0033] mb-2">
                             {formatVND(toNumber(inst.amount))}đ
                           </div>
-                          {inst.status === 'pending' && (
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCreateInvoice(selectedContract.id, inst.id);
-                              }}
-                              disabled={createInvoiceMut.isPending}
-                              className="h-8 px-3 bg-[#EE0033] text-white hover:bg-[#CC0029] text-xs disabled:opacity-50"
-                            >
-                              {createInvoiceMut.isPending ? 'Đang xử lý...' : 'Xuất HĐ'}
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-2 justify-end">
+                            {canCreateInvoiceFromInstallment(inst.status) && (
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCreateInvoice(selectedContract.id, inst.id);
+                                }}
+                                disabled={createInvoiceMut.isPending}
+                                className="h-8 px-3 bg-[#EE0033] text-white hover:bg-[#CC0029] text-xs disabled:opacity-50"
+                              >
+                                {createInvoiceMut.isPending ? 'Đang xử lý...' : 'Xuất HĐ'}
+                              </Button>
+                            )}
+                            {canManageContracts && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditInstallment(inst);
+                                  }}
+                                  className="h-8 px-2 text-xs"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteError(null);
+                                    setDeleteTarget({
+                                      kind: 'installment',
+                                      contractId: selectedContract.id,
+                                      installment: inst,
+                                    });
+                                  }}
+                                  className="h-8 px-2 text-xs text-[#991B1B] border-[#FECACA] hover:bg-[#FEF2F2]"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
+
+              {/* Contract Documents */}
+              <ContractDocumentsSection
+                contractId={selectedContract.id}
+                canManage={canManageContracts}
+              />
             </div>
           )}
 
@@ -426,22 +638,86 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
         </DialogContent>
       </Dialog>
 
-      {/* Create Modal (deferred — full form lands in a later phase) */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="max-w-2xl">
+      {/* Contract create / edit modal */}
+      <ContractFormModal
+        open={showFormModal}
+        onOpenChange={setShowFormModal}
+        mode={formMode}
+        contract={editingContract}
+      />
+
+      {/* Installment create / edit modal */}
+      {selectedContractId != null && (
+        <InstallmentFormModal
+          open={showInstallmentModal}
+          onOpenChange={setShowInstallmentModal}
+          mode={installmentMode}
+          contractId={selectedContractId}
+          installment={editingInstallment}
+        />
+      )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Tạo hợp đồng mới</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle size={18} className="text-[#EE0033]" />
+              Xác nhận xoá
+            </DialogTitle>
             <DialogDescription>
-              Nhập thông tin hợp đồng và định nghĩa các đợt thanh toán
+              {deleteTarget?.kind === 'contract' && (
+                <>
+                  Bạn có chắc muốn xoá hợp đồng <strong>{deleteTarget.contract.code}</strong> (
+                  {deleteTarget.contract.name})? Hành động này không thể hoàn tác.
+                </>
+              )}
+              {deleteTarget?.kind === 'installment' && (
+                <>
+                  Bạn có chắc muốn xoá{' '}
+                  <strong>
+                    {deleteTarget.installment.name ?? `đợt ${deleteTarget.installment.sequence}`}
+                  </strong>
+                  ? Hành động này không thể hoàn tác.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-6 text-center text-sm text-[#6B7280]">
-            Form tạo hợp đồng sẽ được hoàn thiện ở giai đoạn tiếp theo. Hiện tại hợp đồng được khởi
-            tạo từ phía admin/quản lý hợp đồng trong hệ thống.
-          </div>
+
+          {deleteError && (
+            <div className="bg-[#FEF2F2] border border-[#FECACA] text-[#991B1B] text-sm rounded-md px-3 py-2">
+              {deleteError}
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-              Đóng
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteError(null);
+              }}
+              disabled={deleteContractMut.isPending || deleteInstallmentMut.isPending}
+            >
+              Huỷ
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              disabled={deleteContractMut.isPending || deleteInstallmentMut.isPending}
+              className="bg-[#EE0033] text-white hover:bg-[#CC0029] disabled:opacity-50"
+            >
+              {(deleteContractMut.isPending || deleteInstallmentMut.isPending) && (
+                <Loader2 size={16} className="mr-2 animate-spin" />
+              )}
+              Xoá
             </Button>
           </DialogFooter>
         </DialogContent>
