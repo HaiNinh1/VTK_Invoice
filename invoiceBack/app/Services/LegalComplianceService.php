@@ -10,9 +10,10 @@ class LegalComplianceService
     /**
      * Compute legal compliance for an invoice request.
      *
-     * Required document codes come from the invoice type's `required_legal_documents`
-     * JSON array. If that is null/empty, we fall back to the catalog default
-     * (LegalDocument rows with `default_required = true`, by `code`).
+     * Required document codes now come from the invoice type/legal document
+     * pivot when it has required rows. During the migration path, invoice types
+     * without pivot rows still fall back to the legacy `required_legal_documents`
+     * JSON array, then finally to catalog defaults (`default_required = true`).
      *
      * Completed codes come from distinct `document_type` values in the
      * `invoice_request_legal_documents` table for this invoice request.
@@ -68,9 +69,10 @@ class LegalComplianceService
     }
 
     /**
-     * Resolve the required legal document codes for an invoice request.
-     * Falls back to the catalog defaults when the invoice type does not
-     * configure its own set.
+     * Resolve the required legal document codes for an invoice request. The
+     * normalized invoice_type_legal_document pivot is authoritative when
+     * populated; otherwise legacy JSON/default catalog fallbacks keep existing
+     * seeded data and historical invoices compatible.
      *
      * @return array<int,string>
      */
@@ -79,6 +81,20 @@ class LegalComplianceService
         $type = $request->relationLoaded('invoiceType')
             ? $request->invoiceType
             : $request->invoiceType()->first();
+
+        if ($type !== null) {
+            $pivotCodes = $type->legalDocuments()
+                ->wherePivot('required', true)
+                ->pluck('legal_documents.code')
+                ->map(fn ($code) => (string) $code)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (count($pivotCodes) > 0) {
+                return $pivotCodes;
+            }
+        }
 
         $codes = $type?->required_legal_documents;
 
