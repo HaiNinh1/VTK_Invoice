@@ -49,6 +49,7 @@ class InvoiceRequestResource extends JsonResource
             'rejection_reason' => $this->rejection_reason,
             's_invoice_status' => $this->s_invoice_status?->value,
             's_invoice_code' => $this->s_invoice_code,
+            's_invoice_error' => $this->s_invoice_error,
             'vfs_status' => $this->vfs_status?->value,
             'notes' => $this->notes,
             'created_at' => optional($this->created_at)->toIso8601String(),
