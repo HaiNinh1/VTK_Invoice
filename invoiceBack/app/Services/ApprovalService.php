@@ -40,7 +40,10 @@ class ApprovalService
                 ? ApprovalStep::Accountant
                 : ApprovalStep::Director;
 
-            if (! $request->legal_complete && ! $request->commitments()->exists()) {
+            if (! $request->legal_complete && ! $request->commitments()
+                ->where('director_decision', 'pending')
+                ->where('status', 'pending')
+                ->exists()) {
                 throw new AuthorizationException('Hồ sơ pháp lý chưa đầy đủ. Vui lòng tạo cam kết bổ sung.');
             }
 

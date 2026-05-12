@@ -29,7 +29,8 @@ class SpecialBranchTest extends TestCase
             'invoice_request_id' => $invoice->id,
             'code' => 'CK-001',
             'content' => 'Bổ sung hồ sơ pháp lý sau.',
-            'status' => 'active',
+            'status' => 'pending',
+            'director_decision' => 'pending',
             'created_by' => $employee->id,
         ]);
 
