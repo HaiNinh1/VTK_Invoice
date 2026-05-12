@@ -1,21 +1,42 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  ChevronDown, ChevronUp, Upload, Eye, AlertTriangle, FileText,
-  Check, X, Clock, Loader, Lock, ArrowLeft, ExternalLink, Copy,
-  Edit3, Send, Zap, Filter, Download, Calendar, AlertCircle
+  ChevronDown,
+  ChevronUp,
+  Upload,
+  AlertTriangle,
+  Check,
+  X,
+  Clock,
+  Lock,
+  ArrowLeft,
+  ExternalLink,
+  Copy,
+  Send,
+  AlertCircle,
+  Loader2,
+  Trash2,
 } from 'lucide-react';
-import { 
-  formatNumberInput, 
-  parseNumberInput, 
-  calculateVAT, 
-  calculateTotal,
-  getTodayString,
-  getMinFutureDateString,
-  scrollToError,
-  calculateChecklistProgress,
-  hasCommitmentItems
-} from '../utils/formHelpers';
-import { DetailViewHeader, QuickLinksPills } from './NavigationHelpers';
+import { QuickLinksPills } from './NavigationHelpers';
+import {
+  createInvoiceRequestSchema,
+  type CreateInvoiceRequestInput,
+} from '../../lib/validation';
+import {
+  useCustomers,
+  useContracts,
+  useContractInstallments,
+  useInvoiceTypes,
+  useServiceTypes,
+  useLegalDocumentsCatalog,
+  useCreateInvoiceRequest,
+} from '../../lib/api/queries';
+import { invoiceRequestsApi } from '../../lib/api/endpoints/invoiceRequests';
+import { useAuth } from '../../lib/auth/AuthProvider';
+import { getTodayString } from '../utils/formHelpers';
+
+type AppUserRole = 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
 
 interface CreateInvoiceRoleBasedProps {
   onBack: () => void;
@@ -29,1159 +50,1118 @@ interface CreateInvoiceRoleBasedProps {
   };
   rejectionReason?: string;
   returnReason?: string;
-  onNavigateToView?: (view: string) => void; // For quick links
-  userRole?: 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
+  onNavigateToView?: (view: string) => void;
+  userRole?: AppUserRole;
+  /** Optional callback after successful create + upload. */
+  onSuccess?: (newInvoiceId: number) => void;
 }
+
+interface PendingAttachment {
+  legalDocumentId: number;
+  legalDocumentName: string;
+  file: File;
+  notes?: string;
+}
+
+// ------- helpers -------
+
+function toNumber(v: number | string | null | undefined): number {
+  if (v === null || v === undefined || v === '') return 0;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatVND(n: number): string {
+  return n.toLocaleString('vi-VN');
+}
+
+function roleBadge(role: AppUserRole) {
+  const map: Record<AppUserRole, { bg: string; text: string; label: string }> = {
+    admin: { bg: '#F3E8FF', text: '#7C3AED', label: 'Quản trị viên' },
+    director: { bg: '#FFF1F3', text: '#EE0033', label: 'Giám đốc' },
+    accountant: { bg: '#DBEAFE', text: '#1D4ED8', label: 'Kế toán' },
+    manager: { bg: '#FED7AA', text: '#C2410C', label: 'Quản lý' },
+    employee: { bg: '#F3F4F6', text: '#4B5563', label: 'Chuyên viên' },
+  };
+  const s = map[role];
+  return (
+    <span
+      className="inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-medium"
+      style={{ backgroundColor: s.bg, color: s.text }}
+    >
+      {s.label}
+    </span>
+  );
+}
+
+// ------- component -------
 
 export default function CreateInvoiceRoleBased({
   onBack,
-  requestId = 'DN-2026-00156',
+  requestId,
   status = 'draft',
   isOwner = true,
-  ownerInfo = {
-    name: 'Nguyễn Văn A',
-    department: 'P. Kỹ thuật Công nghệ',
-    date: '10/03/2026'
-  },
-  rejectionReason = 'Giá trị hợp đồng không khớp với biên bản nghiệm thu. Vui lòng kiểm tra lại.',
-  returnReason = 'Thiếu chữ ký đại diện khách hàng trên Biên bản nghiệm thu',
+  ownerInfo,
+  rejectionReason,
+  returnReason,
   onNavigateToView,
-  userRole = 'employee'
+  userRole,
+  onSuccess,
 }: CreateInvoiceRoleBasedProps) {
-  const [activeTab, setActiveTab] = useState<'info' | 'checklist' | 'preview' | 'activity'>('info');
+  const { user, primaryRole } = useAuth();
+  const role: AppUserRole = userRole ?? primaryRole;
+
+  const isCreateMode = !requestId;
+  const canEdit = isCreateMode && isOwner && (status === 'draft' || status === 'returned');
+  const isReadOnly = !canEdit;
+
+  const [activeTab, setActiveTab] = useState<'info' | 'checklist' | 'preview'>('info');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     section1: true,
     section2: true,
     section3: true,
-    section4: true
+    section4: true,
   });
-  const [invoiceType, setInvoiceType] = useState('new');
-  const [hasSignature, setHasSignature] = useState(true);
-  
-  // LEGAL CHECKLIST STATE - CRITICAL FOR BUSINESS RULE
-  const [legalChecklist, setLegalChecklist] = useState({
-    '1': true,  // Pre-checked for demo
-    '2': true,  // Pre-checked for demo
-    '3': false,
-    '4': true,  // Pre-checked for demo
-    '5': false,
-    '6': false,
-    '7': false,
-    '8': false,
-    '9': true,  // Pre-checked for demo
-    '10': false,
-    '11': false,
-  });
+  const toggleSection = (s: string) =>
+    setExpandedSections((p) => ({ ...p, [s]: !p[s] }));
 
-  // COMMITMENT STATE - CRITICAL FOR BUSINESS RULE
-  const [hasCommitment, setHasCommitment] = useState(false);
-  const [commitmentData, setCommitmentData] = useState({
-    deadline: '',
-    content: 'Tôi cam kết bổ sung đầy đủ hồ sơ pháp lý còn thiếu theo danh mục trên trước ngày [date]. Trong trường hợp không hoàn thành đúng hạn, tôi hoàn toàn chịu trách nhiệm trước Ban Giám đốc Công ty.',
-    signed: false
-  });
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    beforeVAT: '2.450.000.000',
-    vatRate: '10',
-    vat: '245.000.000',
-    afterVAT: '2.695.000.000',
-    contractDate: '2026-02-05',
-    customer: 'Tập đoàn VNPT',
-    taxCode: '0100109106',
-    address: '57 Huỳnh Thúc Kháng, Đống Đa, Hà Nội',
-    buyerName: 'Nguyễn Văn B',
-    buyerEmail: 'nguyen.b@vnpt.vn',
-    buyerPhone: '024 3974 0000',
-    contractNumber: 'HĐ-VNPT-2026-00125',
-    serviceType: 'Lắp đặt', // Changed to "Lắp đặt" for the demo
-    serviceContent: 'Tích hợp hệ thống quản lý doanh nghiệp ERP cho VNPT'
-  });
-  
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [lastCalculatedField, setLastCalculatedField] = useState<string | null>(null);
-  
-  const beforeVATRef = useRef<HTMLInputElement>(null);
-  const vatRef = useRef<HTMLDivElement>(null);
-  const totalRef = useRef<HTMLDivElement>(null);
-
-  // Determine if form should be read-only
-  const isReadOnly = !isOwner || (isOwner && status !== 'draft' && status !== 'returned');
-  const canEdit = isOwner && (status === 'draft' || status === 'returned');
-
-  // CALCULATE CHECKLIST COMPLETION - CRITICAL
-  const totalChecklistItems = 11;
-  const checkedCount = Object.values(legalChecklist).filter(Boolean).length;
-  const completionPercent = Math.round((checkedCount / totalChecklistItems) * 100);
-  const isChecklistComplete = completionPercent === 100;
-
-  // CAN SUBMIT LOGIC - CRITICAL BUSINESS RULE
-  const canSubmitForApproval = isChecklistComplete || hasCommitment;
-  
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  // LEGAL CHECKLIST GROUPS - 11 items across 4 groups
-  const checklistGroups = [
-    {
-      id: 'contract',
-      name: 'Hồ sơ Hợp đồng',
-      items: [
-        { id: '1', name: 'Hợp đồng đã ký (bản scan)', status: 'complete' },
-        { id: '2', name: 'Phụ lục hợp đồng (nếu có)', status: 'complete' },
-        { id: '3', name: 'Biên bản đàm phán giá', status: 'pending' },
-      ]
+  // ---------- form ----------
+  const form = useForm<CreateInvoiceRequestInput>({
+    resolver: zodResolver(createInvoiceRequestSchema),
+    defaultValues: {
+      customer_id: undefined as unknown as number,
+      invoice_type_id: undefined as unknown as number,
+      service_type_id: undefined as unknown as number,
+      contract_id: null,
+      payment_installment_id: null,
+      revenue_center_id: null,
+      amount_before_vat: 0,
+      tax_rate: 10,
+      vat_amount: 0,
+      amount_after_vat: 0,
+      notes: '',
     },
-    {
-      id: 'acceptance',
-      name: 'Hồ sơ Nghiệm thu',
-      items: [
-        { id: '4', name: 'Biên bản nghiệm thu khối lượng', status: 'complete' },
-        { id: '5', name: 'Biên bản nghiệm thu hoàn thành', status: 'pending' },
-        { id: '6', name: 'Bảng tổng hợp khối lượng nghiệm thu', status: 'pending' },
-      ]
-    },
-    {
-      id: 'settlement',
-      name: 'Hồ sơ Quyết toán',
-      items: [
-        { id: '7', name: 'Biên bản quyết toán', status: 'pending' },
-        { id: '8', name: 'Bảng tính giá trị quyết toán', status: 'pending' },
-        { id: '9', name: 'Xác nhận công nợ', status: 'complete' },
-      ]
-    },
-    {
-      id: 'payment',
-      name: 'Hồ sơ Thanh toán & Bảo lãnh',
-      items: [
-        { id: '10', name: 'Đề nghị thanh toán', status: 'pending' },
-        { id: '11', name: 'Bảo lãnh thực hiện HĐ / Bảo lãnh bảo hành', status: 'pending' },
-      ]
-    }
-  ];
+  });
 
-  // Toggle checklist item
-  const toggleChecklistItem = (itemId: string) => {
-    if (canEdit) {
-      setLegalChecklist(prev => ({
-        ...prev,
-        [itemId]: !prev[itemId]
-      }));
-      setHasUnsavedChanges(true);
-    }
-  };
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = form;
 
-  // Handle commitment creation
-  const handleCreateCommitment = () => {
-    if (commitmentData.deadline && commitmentData.content) {
-      setHasCommitment(true);
-      setCommitmentData(prev => ({ ...prev, signed: true }));
-      // In real app, would show toast notification
-      alert('Đã tạo cam kết. Đề nghị sẽ chuyển PGĐ duyệt đặc biệt.');
-    }
-  };
+  const customerId = watch('customer_id');
+  const contractId = watch('contract_id');
+  const amountBefore = watch('amount_before_vat');
+  const taxRate = watch('tax_rate') ?? 0;
 
-  // Check if commitment form is valid
-  const isCommitmentValid = commitmentData.deadline && commitmentData.content;
+  // Auto-calc VAT + total
+  useEffect(() => {
+    const before = toNumber(amountBefore);
+    const rate = toNumber(taxRate);
+    const vat = Math.round((before * rate) / 100);
+    setValue('vat_amount', vat, { shouldValidate: false });
+    setValue('amount_after_vat', before + vat, { shouldValidate: false });
+  }, [amountBefore, taxRate, setValue]);
 
-  // Get page title based on context
-  const getPageTitle = () => {
-    if (!isOwner) {
-      return `Chi tiết đề nghị ${requestId}`;
-    }
-    if (status === 'draft') {
-      return requestId ? 'Sửa đề nghị xuất Hoá đơn' : 'Tạo đề nghị xuất Hoá đơn';
-    }
-    return `Chi tiết đề nghị ${requestId}`;
-  };
-
-  // Status banner component
-  const StatusBanner = () => {
-    if (!isOwner) {
-      // Manager viewing department member's request
-      if (userRole === 'manager') {
-        return (
-          <div className="bg-[#FEF3C7] border border-[#F59E0B] rounded-lg p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#FDE68A] flex items-center justify-center text-[#78350F] text-sm font-medium flex-shrink-0">
-              {ownerInfo.name.split(' ').pop()?.charAt(0) || 'N'}
-            </div>
-            <div>
-              <div className="text-sm font-medium text-[#78350F]">
-                Đề nghị của: {ownerInfo.name} — Chuyên viên — {ownerInfo.department}
-              </div>
-              <div className="text-xs text-[#92400E] mt-0.5">Ngày tạo: {ownerInfo.date}</div>
-            </div>
-          </div>
-        );
-      }
-      
-      // Accountant/Director/Admin viewing
-      return (
-        <div className="bg-[#F3F4F6] border border-[#D1D5DB] rounded-lg p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#E5E7EB] flex items-center justify-center text-[#374151] text-sm font-medium flex-shrink-0">
-            {ownerInfo.name.split(' ').pop()?.charAt(0) || 'N'}
-          </div>
-          <div>
-            <div className="text-sm font-medium text-[#111827]">
-              Tạo bởi: {ownerInfo.name} — {ownerInfo.department}
-            </div>
-            <div className="text-xs text-[#6B7280] mt-0.5">Ngày tạo: {ownerInfo.date}</div>
-          </div>
-        </div>
-      );
-    }
-
-    switch (status) {
-      case 'pending':
-        return (
-          <div className="bg-[#FFFBEB] border border-[#F59E0B] rounded-lg p-4 flex items-center gap-3">
-            <Clock size={20} className="text-[#F59E0B] flex-shrink-0" />
-            <div className="flex-1">
-              <div className="text-sm font-medium text-[#92400E]">
-                Đề nghị đang chờ phê duyệt. Bạn không thể sửa cho đến khi bị trả lại.
-              </div>
-            </div>
-          </div>
-        );
-      
-      case 'approved':
-      case 'issued':
-        return (
-          <div className="bg-[#D1FAE5] border border-[#16A34A] rounded-lg p-4 flex items-center gap-3">
-            <Check size={20} className="text-[#16A34A] flex-shrink-0" />
-            <div className="flex-1">
-              <div className="text-sm font-medium text-[#065F46]">
-                Đề nghị đã được phê duyệt.
-              </div>
-              {status === 'issued' && (
-                <button className="text-sm text-[#16A34A] underline mt-1 flex items-center gap-1 hover:text-[#065F46]">
-                  Xem HĐ trên S-Invoice <ExternalLink size={12} />
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      
-      case 'rejected':
-        return (
-          <div className="bg-[#FEE2E2] border border-[#DC2626] rounded-lg p-4">
-            <div className="flex items-start gap-3 mb-3">
-              <X size={20} className="text-[#DC2626] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <div className="text-sm font-medium text-[#991B1B] mb-1">
-                  Đề nghị đã bị từ chối
-                </div>
-                <div className="text-sm text-[#7F1D1D]">
-                  Lý do: {rejectionReason}
-                </div>
-              </div>
-            </div>
-            <button className="h-9 px-4 bg-[#DC2626] text-white text-sm font-medium rounded-lg hover:bg-[#B91C1C] flex items-center gap-2">
-              <Copy size={14} />
-              Tạo đề nghị mới từ bản này
-            </button>
-          </div>
-        );
-      
-      case 'returned':
-        return (
-          <div className="bg-[#FEF3C7] border border-[#D97706] rounded-lg p-4 flex items-start gap-3">
-            <AlertTriangle size={20} className="text-[#D97706] flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="text-sm font-medium text-[#92400E] mb-1">
-                Đề nghị đã được trả lại
-              </div>
-              <div className="text-sm text-[#78350F]">
-                Lý do: {returnReason}
-              </div>
-              <div className="text-sm text-[#92400E] mt-2">
-                Vui lòng bổ sung thông tin và gửi lại.
-              </div>
-            </div>
-          </div>
-        );
-      
-      default:
-        return null;
-    }
-  };
-
-  // Field wrapper for read-only state
-  const InputField = ({ 
-    label, 
-    value, 
-    placeholder, 
-    required = false,
-    highlighted = false 
-  }: { 
-    label: string; 
-    value?: string; 
-    placeholder?: string; 
-    required?: boolean;
-    highlighted?: boolean;
-  }) => (
-    <div>
-      <label className="block text-sm font-medium text-[#374151] mb-1.5">
-        {label}
-        {required && <span className="text-[#DC2626] ml-1">*</span>}
-      </label>
-      <input
-        type="text"
-        value={value}
-        placeholder={placeholder}
-        disabled={isReadOnly}
-        onChange={() => {}}
-        className={`w-full h-10 px-3 text-sm rounded-lg transition-colors ${
-          isReadOnly 
-            ? 'bg-[#F3F4F6] text-[#6B7280] cursor-not-allowed border-0' 
-            : highlighted
-            ? 'border-2 border-[#F59E0B] bg-[#FFFBEB] focus:ring-2 focus:ring-[#F59E0B]'
-            : 'border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033]'
-        }`}
-      />
-    </div>
+  // ---------- master data hooks ----------
+  const [customerSearch, setCustomerSearch] = useState('');
+  const customersQ = useCustomers({ search: customerSearch || undefined, per_page: 50 });
+  const contractsQ = useContracts({
+    customer_id: typeof customerId === 'number' && customerId > 0 ? customerId : undefined,
+    status: 'active',
+    per_page: 50,
+  });
+  const installmentsQ = useContractInstallments(
+    typeof contractId === 'number' && contractId > 0 ? contractId : null
   );
+  const invoiceTypesQ = useInvoiceTypes({ status: 'active', per_page: 100 });
+  const serviceTypesQ = useServiceTypes({ per_page: 100 });
+  const legalCatalogQ = useLegalDocumentsCatalog();
 
-  const SelectField = ({ 
-    label, 
-    value, 
-    options, 
-    required = false 
-  }: { 
-    label: string; 
-    value?: string; 
-    options: string[]; 
-    required?: boolean;
+  const customers = customersQ.data?.data ?? [];
+  const contracts = contractsQ.data?.data ?? [];
+  const installments = (installmentsQ.data ?? []).filter((i) => i.status === 'pending');
+  const invoiceTypes = invoiceTypesQ.data?.data ?? [];
+  const serviceTypes = serviceTypesQ.data?.data ?? [];
+  const legalCatalog = legalCatalogQ.data?.data ?? [];
+
+  // Reset dependent fields when customer changes
+  useEffect(() => {
+    setValue('contract_id', null);
+    setValue('payment_installment_id', null);
+  }, [customerId, setValue]);
+  useEffect(() => {
+    setValue('payment_installment_id', null);
+  }, [contractId, setValue]);
+
+  // ---------- legal checklist + attachments ----------
+  const [checkedDocs, setCheckedDocs] = useState<Record<number, boolean>>({});
+  const [attachments, setAttachments] = useState<Record<number, PendingAttachment>>({});
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeUploadDocId, setActiveUploadDocId] = useState<number | null>(null);
+
+  const requiredDocs = useMemo(
+    () =>
+      legalCatalog.filter(
+        (d) => d.enabled !== false && (d.default_required ?? true)
+      ),
+    [legalCatalog]
+  );
+  const totalChecklistItems = requiredDocs.length;
+  const checkedCount = requiredDocs.filter((d) => checkedDocs[d.id]).length;
+  const completionPercent = totalChecklistItems
+    ? Math.round((checkedCount / totalChecklistItems) * 100)
+    : 0;
+  const isChecklistComplete = totalChecklistItems > 0 && checkedCount === totalChecklistItems;
+
+  const handleFilePick = (legalDocId: number, legalDocName: string) => {
+    setActiveUploadDocId(legalDocId);
+    setTimeout(() => fileInputRef.current?.click(), 0);
+    // store name for later
+    setAttachments((prev) => ({
+      ...prev,
+      [legalDocId]: prev[legalDocId] ?? {
+        legalDocumentId: legalDocId,
+        legalDocumentName: legalDocName,
+        file: undefined as unknown as File,
+      },
+    }));
+  };
+
+  const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || activeUploadDocId == null) return;
+    const docId = activeUploadDocId;
+    const doc = legalCatalog.find((d) => d.id === docId);
+    setAttachments((prev) => ({
+      ...prev,
+      [docId]: {
+        legalDocumentId: docId,
+        legalDocumentName: doc?.name ?? `Tài liệu #${docId}`,
+        file,
+      },
+    }));
+    setCheckedDocs((prev) => ({ ...prev, [docId]: true }));
+    setActiveUploadDocId(null);
+  };
+
+  const removeAttachment = (docId: number) => {
+    setAttachments((prev) => {
+      const next = { ...prev };
+      delete next[docId];
+      return next;
+    });
+    setCheckedDocs((prev) => {
+      const next = { ...prev };
+      delete next[docId];
+      return next;
+    });
+  };
+
+  // ---------- commitment ----------
+  const [hasCommitment, setHasCommitment] = useState(false);
+  const [commitmentDeadline, setCommitmentDeadline] = useState('');
+  const [commitmentReason, setCommitmentReason] = useState('');
+
+  const canSubmitForApproval = isChecklistComplete || hasCommitment;
+
+  // ---------- submit ----------
+  const createMut = useCreateInvoiceRequest();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+
+  const onValid = async (values: CreateInvoiceRequestInput) => {
+    setSubmitError(null);
+    setUploadProgress(null);
+    try {
+      const created = await createMut.mutateAsync(values);
+      const newId = (created as { id?: number })?.id;
+
+      // Sequentially upload legal documents
+      const filesToUpload = Object.values(attachments).filter(
+        (a): a is PendingAttachment => !!a.file
+      );
+      const uploadFailures: string[] = [];
+      if (newId && filesToUpload.length > 0) {
+        for (let i = 0; i < filesToUpload.length; i++) {
+          const a = filesToUpload[i];
+          setUploadProgress(`Đang tải tệp ${i + 1}/${filesToUpload.length}: ${a.legalDocumentName}`);
+          try {
+            await invoiceRequestsApi.legalDocuments.upload(
+              newId,
+              a.file,
+              String(a.legalDocumentId)
+            );
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Lỗi không xác định';
+            uploadFailures.push(`${a.legalDocumentName}: ${msg}`);
+          }
+        }
+      }
+      setUploadProgress(null);
+
+      if (uploadFailures.length > 0) {
+        alert(
+          'Đề nghị đã được tạo nhưng có lỗi khi tải hồ sơ:\n' +
+            uploadFailures.join('\n')
+        );
+      } else {
+        alert('Tạo đề nghị xuất hoá đơn thành công.');
+      }
+
+      if (newId != null && onSuccess) onSuccess(newId);
+      else onBack();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Tạo đề nghị thất bại';
+      setSubmitError(msg);
+    }
+  };
+
+  const onInvalid = () => {
+    // Open relevant tab so user sees errors
+    setActiveTab('info');
+  };
+
+  const pageTitle = isCreateMode
+    ? 'Tạo đề nghị xuất Hoá đơn'
+    : `Chi tiết đề nghị ${requestId}`;
+
+  const ownerName =
+    ownerInfo?.name ?? user?.name ?? 'Người dùng';
+  const ownerDept =
+    ownerInfo?.department ?? user?.department?.name ?? '—';
+
+  // ---------- render helpers ----------
+  const FieldError = ({ msg }: { msg?: string }) =>
+    msg ? <p className="mt-1 text-xs text-[#DC2626]">{msg}</p> : null;
+
+  const SectionShell = ({
+    id,
+    title,
+    children,
+  }: {
+    id: string;
+    title: string;
+    children: React.ReactNode;
   }) => (
-    <div>
-      <label className="block text-sm font-medium text-[#374151] mb-1.5">
-        {label}
-        {required && <span className="text-[#DC2626] ml-1">*</span>}
-      </label>
-      <select
-        value={value}
-        disabled={isReadOnly}
-        onChange={() => {}}
-        className={`w-full h-10 px-3 text-sm rounded-lg transition-colors ${
-          isReadOnly 
-            ? 'bg-[#F3F4F6] text-[#6B7280] cursor-not-allowed border-0' 
-            : 'border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033]'
-        }`}
+    <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => toggleSection(id)}
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-[#F9FAFB] transition-colors"
       >
-        {options.map(opt => (
-          <option key={opt}>{opt}</option>
-        ))}
-      </select>
+        <h3 className="text-base font-semibold text-[#111827]">{title}</h3>
+        {expandedSections[id] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+      </button>
+      {expandedSections[id] && <div className="px-6 pb-6 space-y-4">{children}</div>}
     </div>
   );
 
   return (
     <div className="space-y-6 pb-24">
-      {/* NAVIGATION HEADER WITH QUICK LINKS */}
-      <div className="mb-4">
-        <QuickLinksPills
-          recordId={requestId}
-          links={[
-            { 
-              id: 'legal', 
-              label: 'Pháp lý', 
-              count: '8/11',
-              status: status === 'returned' ? 'warning' : 'complete',
-              onClick: () => {
-                // Navigate to legal view filtered to this record
-                if (onNavigateToView) onNavigateToView('legal');
-              }
-            },
-            { 
-              id: 'sinvoice', 
-              label: 'S-Invoice', 
-              status: status === 'issued' ? 'complete' : 'pending',
-              onClick: () => {
-                if (onNavigateToView) onNavigateToView('sinvoice');
-              }
-            },
-            { 
-              id: 'vfs', 
-              label: 'VFS', 
-              status: status === 'issued' ? 'complete' : 'pending',
-              onClick: () => {
-                if (onNavigateToView) onNavigateToView('accounting');
-              }
-            },
-            { 
-              id: 'approval', 
-              label: 'Phê duyệt', 
-              status: status === 'approved' || status === 'issued' ? 'complete' : status === 'rejected' ? 'error' : 'pending',
-              onClick: () => {
-                if (onNavigateToView) onNavigateToView('approval');
-              }
-            }
-          ]}
-        />
-      </div>
+      {/* hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+        onChange={handleFileChosen}
+      />
+
+      {/* QUICK LINKS (only meaningful in detail view) */}
+      {!isCreateMode && requestId && (
+        <div className="mb-4">
+          <QuickLinksPills
+            recordId={requestId}
+            links={[
+              {
+                id: 'legal',
+                label: 'Pháp lý',
+                count: `${checkedCount}/${totalChecklistItems || 0}`,
+                status: status === 'returned' ? 'warning' : 'complete',
+                onClick: () => onNavigateToView?.('legal'),
+              },
+              {
+                id: 'sinvoice',
+                label: 'S-Invoice',
+                status: status === 'issued' ? 'complete' : 'pending',
+                onClick: () => onNavigateToView?.('sinvoice'),
+              },
+              {
+                id: 'approval',
+                label: 'Phê duyệt',
+                status:
+                  status === 'approved' || status === 'issued'
+                    ? 'complete'
+                    : status === 'rejected'
+                    ? 'error'
+                    : 'pending',
+                onClick: () => onNavigateToView?.('approval'),
+              },
+            ]}
+          />
+        </div>
+      )}
 
       {/* HEADER */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <button 
+          <button
+            type="button"
             onClick={onBack}
             className="p-1 hover:bg-[#F3F4F6] rounded transition-colors"
           >
             <ArrowLeft size={20} className="text-[#6B7280]" />
           </button>
-          <h1 className="text-base md:text-2xl font-semibold text-[#111827]">{getPageTitle()}</h1>
+          <h1 className="text-base md:text-2xl font-semibold text-[#111827]">{pageTitle}</h1>
+          <div className="ml-2">{roleBadge(role)}</div>
         </div>
         <p className="text-xs md:text-sm text-[#6B7280] ml-9">
-          {isReadOnly ? 'Xem thông tin chi tiết đề nghị' : 'Điền đầy đủ thông tin để tạo đề nghị xuất hoá đơn'}
+          {isCreateMode
+            ? 'Điền đầy đủ thông tin để tạo đề nghị xuất hoá đơn'
+            : 'Xem thông tin chi tiết đề nghị'}
         </p>
       </div>
 
-      {/* STATUS BANNER */}
-      <StatusBanner />
-
-      {/* SIGNATURE WARNING (only for draft/returned and owner) */}
-      {canEdit && !hasSignature && (
-        <div className="bg-[#FFFBEB] border border-[#F59E0B] rounded-lg p-4 flex items-start gap-3">
-          <AlertTriangle size={20} className="text-[#F59E0B] flex-shrink-0" />
-          <div className="flex-1">
-            <div className="text-sm font-medium text-[#92400E] mb-1">
-              Bạn chưa thiết lập chữ ký số
+      {/* STATUS BANNERS (view mode) */}
+      {!isCreateMode && status === 'rejected' && (
+        <div className="bg-[#FEE2E2] border border-[#DC2626] rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <X size={20} className="text-[#DC2626] flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="text-sm font-medium text-[#991B1B] mb-1">Đề nghị đã bị từ chối</div>
+              {rejectionReason && (
+                <div className="text-sm text-[#7F1D1D]">Lý do: {rejectionReason}</div>
+              )}
             </div>
-            <div className="text-sm text-[#78350F] mb-3">
-              Chữ ký số được yêu cầu để gửi phê duyệt và cam kết hồ sơ pháp lý. Vui lòng thiết lập ngay.
-            </div>
-            <button className="h-9 px-4 bg-[#F59E0B] text-white text-sm font-medium rounded-lg hover:bg-[#D97706]">
-              Thiết lập chữ ký ngay
-            </button>
           </div>
+        </div>
+      )}
+      {!isCreateMode && status === 'returned' && (
+        <div className="bg-[#FEF3C7] border border-[#D97706] rounded-lg p-4 flex items-start gap-3">
+          <AlertTriangle size={20} className="text-[#D97706] flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="text-sm font-medium text-[#92400E] mb-1">Đề nghị đã được trả lại</div>
+            {returnReason && <div className="text-sm text-[#78350F]">Lý do: {returnReason}</div>}
+          </div>
+        </div>
+      )}
+      {!isCreateMode && (status === 'approved' || status === 'issued') && (
+        <div className="bg-[#D1FAE5] border border-[#16A34A] rounded-lg p-4 flex items-center gap-3">
+          <Check size={20} className="text-[#16A34A] flex-shrink-0" />
+          <div className="text-sm font-medium text-[#065F46]">Đề nghị đã được phê duyệt.</div>
+          {status === 'issued' && <ExternalLink size={14} className="text-[#16A34A]" />}
+        </div>
+      )}
+      {!isCreateMode && status === 'pending' && (
+        <div className="bg-[#FFFBEB] border border-[#F59E0B] rounded-lg p-4 flex items-center gap-3">
+          <Clock size={20} className="text-[#F59E0B] flex-shrink-0" />
+          <div className="text-sm font-medium text-[#92400E]">
+            Đề nghị đang chờ phê duyệt.
+          </div>
+        </div>
+      )}
+
+      {/* Role-specific helper */}
+      {isCreateMode && (
+        <div className="bg-[#F0F9FF] border border-[#93C5FD] rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle size={16} className="text-[#1D4ED8] flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-[#1E40AF]">
+            {role === 'employee' && (
+              <>Bạn đang tạo đề nghị với vai trò <strong>Chuyên viên</strong>. Sau khi gửi, đề nghị sẽ được Quản lý / Kế toán duyệt.</>
+            )}
+            {role === 'manager' && (
+              <>Vai trò <strong>Quản lý</strong>: bạn có thể tạo đề nghị cho Trung tâm doanh thu mình phụ trách.</>
+            )}
+            {(role === 'accountant' || role === 'director' || role === 'admin') && (
+              <>Vai trò <strong>{role === 'admin' ? 'Quản trị viên' : role === 'director' ? 'Giám đốc' : 'Kế toán'}</strong>: bạn có quyền tạo đề nghị cho mọi đơn vị, đề nghị có thể được tự duyệt tuỳ chính sách.</>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Submit error banner */}
+      {submitError && (
+        <div className="bg-[#FEE2E2] border border-[#DC2626] rounded-lg p-4 flex items-start gap-3">
+          <X size={18} className="text-[#DC2626] flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-[#991B1B]">{submitError}</div>
         </div>
       )}
 
       {/* TABS */}
       <div className="bg-white border-b border-[#E5E7EB]">
         <div className="flex gap-8 px-6">
-          <button
-            onClick={() => setActiveTab('info')}
-            className={`py-4 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'info'
-                ? 'border-[#EE0033] text-[#EE0033]'
-                : 'border-transparent text-[#6B7280] hover:text-[#374151]'
-            }`}
-          >
-            1. Thông tin đề nghị
-          </button>
-          <button
-            onClick={() => setActiveTab('checklist')}
-            className={`py-4 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'checklist'
-                ? 'border-[#EE0033] text-[#EE0033]'
-                : 'border-transparent text-[#6B7280] hover:text-[#374151]'
-            }`}
-          >
-            2. Hồ sơ pháp lý
-          </button>
-          <button
-            onClick={() => setActiveTab('preview')}
-            className={`py-4 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'preview'
-                ? 'border-[#EE0033] text-[#EE0033]'
-                : 'border-transparent text-[#6B7280] hover:text-[#374151]'
-            }`}
-          >
-            3. Xem trước HĐ
-          </button>
-          <button
-            onClick={() => setActiveTab('activity')}
-            className={`py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
-              activeTab === 'activity'
-                ? 'border-[#EE0033] text-[#EE0033]'
-                : 'border-transparent text-[#6B7280] hover:text-[#374151]'
-            }`}
-          >
-            <Clock size={16} className={activeTab === 'activity' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
-            4. Nhật ký
-          </button>
+          {(['info', 'checklist', 'preview'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setActiveTab(t)}
+              className={`py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === t
+                  ? 'border-[#EE0033] text-[#EE0033]'
+                  : 'border-transparent text-[#6B7280] hover:text-[#374151]'
+              }`}
+            >
+              {t === 'info' && '1. Thông tin đề nghị'}
+              {t === 'checklist' && '2. Hồ sơ pháp lý'}
+              {t === 'preview' && '3. Xem trước'}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* TAB 1: THÔNG TIN ĐỀ NGHỊ */}
-      {activeTab === 'info' && (
-        <div className="space-y-6">
-          {/* Section 1: Thông tin chung */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
-            <button
-              onClick={() => toggleSection('section1')}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-[#F9FAFB] transition-colors"
-            >
-              <h3 className="text-base font-semibold text-[#111827]">1. Thông tin chung</h3>
-              {expandedSections.section1 ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-            </button>
-            {expandedSections.section1 && (
-              <div className="px-6 pb-6 space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <SelectField 
-                    label="Loại hoá đơn" 
-                    value="Hoá đơn mới" 
-                    options={['Hoá đơn mới', 'Hoá đơn điều chỉnh', 'Hoá đơn thay thế']}
-                    required
-                  />
-                  <SelectField 
-                    label="Trung tâm doanh thu" 
-                    value="TT Khu vực 1" 
-                    options={['TT Khu vực 1', 'TT Khu vực 2', 'TT Khu vực 3']}
-                    required
-                  />
-                  <InputField label="Ngày xuất HĐ dự kiến" value="15/03/2026" required />
+      <form onSubmit={handleSubmit(onValid, onInvalid)} noValidate>
+        {/* TAB INFO */}
+        {activeTab === 'info' && (
+          <div className="space-y-6">
+            {/* Section 1: Khách hàng */}
+            <SectionShell id="section1" title="1. Khách hàng">
+              {customersQ.isLoading && (
+                <div className="flex items-center gap-2 text-sm text-[#6B7280]">
+                  <Loader2 size={16} className="animate-spin" /> Đang tải khách hàng…
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Section 2: Thông tin khách hàng */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
-            <button
-              onClick={() => toggleSection('section2')}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-[#F9FAFB] transition-colors"
-            >
-              <h3 className="text-base font-semibold text-[#111827]">2. Thông tin khách hàng</h3>
-              {expandedSections.section2 ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-            </button>
-            {expandedSections.section2 && (
-              <div className="px-6 pb-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <InputField label="Tên khách hàng" value="Tập đoàn VNPT" placeholder="Nhập tên công ty..." required />
-                  <InputField label="Mã số thuế" value="0100109106" placeholder="10 số" required />
-                </div>
-                <InputField label="Địa chỉ" value="57 Huỳnh Thúc Kháng, Đống Đa, Hà Nội" placeholder="Nhập địa chỉ đầy đủ..." required />
-                <div className="grid grid-cols-3 gap-4">
-                  <InputField label="Người mua hàng" value="Nguyễn Văn B" />
-                  <InputField label="Email" value="nguyen.b@vnpt.vn" />
-                  <InputField label="Số điện thoại" value="024 3974 0000" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Section 3: Thông tin hợp đồng */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
-            <button
-              onClick={() => toggleSection('section3')}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-[#F9FAFB] transition-colors"
-            >
-              <h3 className="text-base font-semibold text-[#111827]">3. Thông tin hợp đồng</h3>
-              {expandedSections.section3 ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-            </button>
-            {expandedSections.section3 && (
-              <div className="px-6 pb-6 space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <InputField label="Số hợp đồng" value="HĐ-VNPT-2026-00125" placeholder="Nhập số hợp đồng..." required />
-                  <InputField label="Ngày ký HĐ" value="05/02/2026" required />
-                  <SelectField 
-                    label="Loại dịch vụ" 
-                    value="Tích hợp hệ thống" 
-                    options={['Tích hợp hệ thống', 'Tư vấn CNTT', 'Dịch vụ Cloud', 'Phát triển phần mềm']}
-                    required
-                  />
-                </div>
-                <InputField label="Nội dung dịch vụ" value="Tích hợp hệ thống quản lý doanh nghiệp ERP cho VNPT" />
-              </div>
-            )}
-          </div>
-
-          {/* Section 4: Thông tin giá trị */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
-            <button
-              onClick={() => toggleSection('section4')}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-[#F9FAFB] transition-colors"
-            >
-              <h3 className="text-base font-semibold text-[#111827]">4. Thông tin giá trị</h3>
-              {expandedSections.section4 ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-            </button>
-            {expandedSections.section4 && (
-              <div className="px-6 pb-6 space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <InputField 
-                    label="Giá trị trước VAT" 
-                    value="2.450.000.000" 
-                    placeholder="VNĐ" 
-                    required 
-                    highlighted={status === 'returned'}
-                  />
-                  <SelectField 
-                    label="Thuế suất VAT" 
-                    value="10%" 
-                    options={['0%', '5%', '8%', '10%']}
-                    required
-                  />
-                  <InputField label="Giá trị sau VAT" value="2.695.000.000" required />
-                </div>
-                <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg p-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[#6B7280]">Tổng giá trị thanh toán:</span>
-                    <span className="font-semibold text-[#111827]" style={{ fontVariantNumeric: 'tabular-nums' }}>2.695.000.000 đ</span>
+              )}
+              {customersQ.isError && (
+                <div className="text-sm text-red-700">Không tải được danh sách khách hàng.</div>
+              )}
+              {!customersQ.isLoading && !customersQ.isError && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                      Tìm khách hàng
+                    </label>
+                    <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      placeholder="Tên hoặc mã số thuế…"
+                      disabled={isReadOnly}
+                      className="w-full h-10 px-3 text-sm rounded-lg border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                      Khách hàng <span className="text-[#DC2626]">*</span>
+                    </label>
+                    <Controller
+                      control={control}
+                      name="customer_id"
+                      render={({ field }) => (
+                        <select
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) => field.onChange(Number(e.target.value) || undefined)}
+                          disabled={isReadOnly}
+                          className="w-full h-10 px-3 text-sm rounded-lg border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033]"
+                        >
+                          <option value="">— Chọn khách hàng —</option>
+                          {customers.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} {c.tax_code ? `(MST: ${c.tax_code})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                    <FieldError msg={errors.customer_id?.message} />
+                    {customers.length === 0 && (
+                      <p className="mt-1 text-xs text-[#6B7280]">Không có khách hàng phù hợp.</p>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+              )}
+            </SectionShell>
 
-      {/* TAB 2: HỒ SƠ PHÁT LÝ */}
-      {activeTab === 'checklist' && (
-        <div className="space-y-6">
-          {/* PROGRESS BAR - CRITICAL */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-[#111827]">Tiến độ hồ sơ pháp lý</h3>
-              <div className="text-sm font-medium" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                {checkedCount}/{totalChecklistItems} đã đủ ({completionPercent}%)
+            {/* Section 2: Hợp đồng & Đợt thanh toán */}
+            <SectionShell id="section2" title="2. Hợp đồng & Đợt thanh toán (tuỳ chọn)">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                    Hợp đồng
+                  </label>
+                  {contractsQ.isLoading && (
+                    <div className="text-sm text-[#6B7280] flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin" /> Đang tải…
+                    </div>
+                  )}
+                  {contractsQ.isError && (
+                    <div className="text-sm text-red-700">Không tải được hợp đồng.</div>
+                  )}
+                  {!contractsQ.isLoading && !contractsQ.isError && (
+                    <Controller
+                      control={control}
+                      name="contract_id"
+                      render={({ field }) => (
+                        <select
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(e.target.value ? Number(e.target.value) : null)
+                          }
+                          disabled={isReadOnly || !customerId}
+                          className="w-full h-10 px-3 text-sm rounded-lg border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033] disabled:bg-[#F3F4F6]"
+                        >
+                          <option value="">— Không gắn hợp đồng —</option>
+                          {contracts.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.code} — {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                  )}
+                  {!customerId && (
+                    <p className="mt-1 text-xs text-[#6B7280]">Chọn khách hàng trước.</p>
+                  )}
+                  {customerId && !contractsQ.isLoading && contracts.length === 0 && (
+                    <p className="mt-1 text-xs text-[#6B7280]">
+                      Khách hàng chưa có hợp đồng đang hoạt động.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                    Đợt thanh toán
+                  </label>
+                  {installmentsQ.isLoading && (
+                    <div className="text-sm text-[#6B7280] flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin" /> Đang tải…
+                    </div>
+                  )}
+                  {installmentsQ.isError && (
+                    <div className="text-sm text-red-700">Không tải được đợt thanh toán.</div>
+                  )}
+                  {!installmentsQ.isLoading && !installmentsQ.isError && (
+                    <Controller
+                      control={control}
+                      name="payment_installment_id"
+                      render={({ field }) => (
+                        <select
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(e.target.value ? Number(e.target.value) : null)
+                          }
+                          disabled={isReadOnly || !contractId}
+                          className="w-full h-10 px-3 text-sm rounded-lg border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033] disabled:bg-[#F3F4F6]"
+                        >
+                          <option value="">— Không chọn đợt —</option>
+                          {installments.map((i) => (
+                            <option key={i.id} value={i.id}>
+                              Đợt {i.sequence}
+                              {i.name ? ` — ${i.name}` : ''} — {formatVND(toNumber(i.amount))}đ
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                  )}
+                  {contractId && !installmentsQ.isLoading && installments.length === 0 && (
+                    <p className="mt-1 text-xs text-[#6B7280]">
+                      Hợp đồng không có đợt chờ xuất HĐ.
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-            
-            {/* Progress bar */}
-            <div className="h-3 bg-[#E5E7EB] rounded-full overflow-hidden mb-3">
-              <div 
-                className="h-full bg-[#16A34A] transition-all duration-300"
-                style={{ width: `${completionPercent}%` }}
-              ></div>
-            </div>
+            </SectionShell>
 
-            {/* Status message */}
-            {isChecklistComplete ? (
-              <div className="flex items-center gap-2 text-sm text-[#16A34A] font-medium">
-                <Check size={16} />
-                <span>✓ Đủ hồ sơ pháp lý</span>
+            {/* Section 3: Loại HĐ & Dịch vụ */}
+            <SectionShell id="section3" title="3. Loại hoá đơn & Dịch vụ">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                    Loại hoá đơn <span className="text-[#DC2626]">*</span>
+                  </label>
+                  {invoiceTypesQ.isLoading && (
+                    <div className="text-sm text-[#6B7280] flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin" /> Đang tải…
+                    </div>
+                  )}
+                  {invoiceTypesQ.isError && (
+                    <div className="text-sm text-red-700">Không tải được loại hoá đơn.</div>
+                  )}
+                  {!invoiceTypesQ.isLoading && !invoiceTypesQ.isError && (
+                    <Controller
+                      control={control}
+                      name="invoice_type_id"
+                      render={({ field }) => (
+                        <select
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(Number(e.target.value) || undefined)
+                          }
+                          disabled={isReadOnly}
+                          className="w-full h-10 px-3 text-sm rounded-lg border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033]"
+                        >
+                          <option value="">— Chọn loại hoá đơn —</option>
+                          {invoiceTypes.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.code} — {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                  )}
+                  <FieldError msg={errors.invoice_type_id?.message} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                    Loại dịch vụ <span className="text-[#DC2626]">*</span>
+                  </label>
+                  {serviceTypesQ.isLoading && (
+                    <div className="text-sm text-[#6B7280] flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin" /> Đang tải…
+                    </div>
+                  )}
+                  {serviceTypesQ.isError && (
+                    <div className="text-sm text-red-700">Không tải được loại dịch vụ.</div>
+                  )}
+                  {!serviceTypesQ.isLoading && !serviceTypesQ.isError && (
+                    <Controller
+                      control={control}
+                      name="service_type_id"
+                      render={({ field }) => (
+                        <select
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(Number(e.target.value) || undefined)
+                          }
+                          disabled={isReadOnly}
+                          className="w-full h-10 px-3 text-sm rounded-lg border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033]"
+                        >
+                          <option value="">— Chọn loại dịch vụ —</option>
+                          {serviceTypes.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.code} — {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                  )}
+                  <FieldError msg={errors.service_type_id?.message} />
+                </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-[#DC2626] font-medium">
-                <AlertTriangle size={16} />
-                <span>⚠ Chưa đủ hồ sơ — cần bổ sung hoặc tạo cam kết</span>
-              </div>
-            )}
-          </div>
+            </SectionShell>
 
-          {/* CHECKLIST GROUPS */}
-          {checklistGroups.map((group) => (
-            <div key={group.id} className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
-              <div className="px-6 py-4 bg-[#F9FAFB] border-b border-[#E5E7EB]">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-[#111827]">{group.name}</h3>
-                  <span className="text-sm text-[#6B7280]">
-                    {group.items.filter(item => legalChecklist[item.id]).length}/{group.items.length}
+            {/* Section 4: Giá trị */}
+            <SectionShell id="section4" title="4. Giá trị">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                    Giá trị trước VAT (VNĐ) <span className="text-[#DC2626]">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    disabled={isReadOnly}
+                    {...register('amount_before_vat', { valueAsNumber: true })}
+                    className="w-full h-10 px-3 text-sm rounded-lg border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033]"
+                  />
+                  <FieldError msg={errors.amount_before_vat?.message} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                    Thuế suất (%) 
+                  </label>
+                  <Controller
+                    control={control}
+                    name="tax_rate"
+                    render={({ field }) => (
+                      <select
+                        value={field.value ?? 10}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        disabled={isReadOnly}
+                        className="w-full h-10 px-3 text-sm rounded-lg border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033]"
+                      >
+                        <option value={0}>0%</option>
+                        <option value={5}>5%</option>
+                        <option value={8}>8%</option>
+                        <option value={10}>10%</option>
+                      </select>
+                    )}
+                  />
+                  <FieldError msg={errors.tax_rate?.message} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                    Giá trị sau VAT (VNĐ)
+                  </label>
+                  <input
+                    type="number"
+                    readOnly
+                    {...register('amount_after_vat', { valueAsNumber: true })}
+                    className="w-full h-10 px-3 text-sm rounded-lg bg-[#F3F4F6] border-0 text-[#111827]"
+                  />
+                </div>
+              </div>
+              <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg p-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#6B7280]">Tiền thuế VAT:</span>
+                  <span
+                    className="font-semibold text-[#111827]"
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {formatVND(toNumber(watch('vat_amount')))} đ
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="text-[#6B7280]">Tổng thanh toán:</span>
+                  <span
+                    className="font-semibold text-[#EE0033]"
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {formatVND(toNumber(watch('amount_after_vat')))} đ
                   </span>
                 </div>
               </div>
-              <div className="p-6 space-y-3">
-                {group.items.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className="flex items-start gap-3 p-3 rounded-lg bg-[#F9FAFB] hover:bg-[#F3F4F6] transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={legalChecklist[item.id]}
-                      disabled={!canEdit}
-                      onChange={() => toggleChecklistItem(item.id)}
-                      className={`mt-1 w-5 h-5 rounded border-[#D1D5DB] text-[#EE0033] focus:ring-[#EE0033] ${
-                        !canEdit ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-                      }`}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-[#111827]">{item.name}</span>
-                        {legalChecklist[item.id] ? (
-                          <span className="text-xs px-2 py-1 rounded-full bg-[#D1FAE5] text-[#065F46] font-medium">
-                            ✓ Đã có
-                          </span>
-                        ) : (
-                          <span className="text-xs px-2 py-1 rounded-full bg-[#F3F4F6] text-[#6B7280] font-medium">
-                            Chưa có
-                          </span>
-                        )}
-                      </div>
-                      {canEdit && !legalChecklist[item.id] && (
-                        <button 
-                          className="text-xs text-[#EE0033] hover:underline flex items-center gap-1 mt-1"
-                        >
-                          <Upload size={12} />
-                          Tải lên file
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div>
+                <label className="block text-sm font-medium text-[#374151] mb-1.5">
+                  Ghi chú
+                </label>
+                <textarea
+                  rows={3}
+                  disabled={isReadOnly}
+                  {...register('notes')}
+                  placeholder="Ghi chú thêm về đề nghị (tuỳ chọn)…"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-[#D1D5DB] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033] resize-none"
+                />
+                <FieldError msg={errors.notes?.message} />
               </div>
-            </div>
-          ))}
+            </SectionShell>
+          </div>
+        )}
 
-          {/* COMMITMENT SECTION - CRITICAL - ONLY SHOWN WHEN CHECKLIST < 100% */}
-          {!isChecklistComplete && canEdit && (
-            <div className="bg-[#FEF2F2] border-l-4 border-[#DC2626] rounded-lg p-6">
-              <div className="flex items-start gap-3 mb-4">
-                <AlertTriangle size={24} className="text-[#DC2626] flex-shrink-0 mt-1" />
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-[#DC2626] mb-2">
-                    ⚠ Hồ sơ pháp lý chưa đầy đủ
-                  </h3>
-                  <p className="text-sm text-[#7F1D1D] leading-relaxed">
-                    Để xuất hoá đơn khi chưa đủ hồ sơ, bạn phải tạo <strong>Cam kết bổ sung</strong> với thời hạn cụ thể. 
-                    Chữ ký xác nhận sẽ được tự động gắn từ tài khoản của bạn.
-                  </p>
+        {/* TAB CHECKLIST */}
+        {activeTab === 'checklist' && (
+          <div className="space-y-6">
+            <div className="bg-white border border-[#E5E7EB] rounded-xl p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-[#111827]">
+                  Tiến độ hồ sơ pháp lý
+                </h3>
+                <div
+                  className="text-sm font-medium"
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {checkedCount}/{totalChecklistItems} ({completionPercent}%)
                 </div>
               </div>
-
-              {!hasCommitment ? (
-                <div className="space-y-4">
-                  {/* Commitment deadline */}
-                  <div>
-                    <label className="block text-sm font-medium text-[#7F1D1D] mb-1.5">
-                      Cam kết bổ sung hồ sơ trước ngày: <span className="text-[#DC2626]">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={commitmentData.deadline}
-                      onChange={(e) => setCommitmentData(prev => ({ ...prev, deadline: e.target.value }))}
-                      min={getTodayString()}
-                      className="w-full h-10 px-3 text-sm rounded-lg border-2 border-[#DC2626] focus:ring-2 focus:ring-[#DC2626] focus:border-[#DC2626]"
-                    />
-                  </div>
-
-                  {/* Commitment content */}
-                  <div>
-                    <label className="block text-sm font-medium text-[#7F1D1D] mb-1.5">
-                      Nội dung cam kết: <span className="text-[#DC2626]">*</span>
-                    </label>
-                    <textarea
-                      value={commitmentData.content.replace('[date]', commitmentData.deadline || '___________')}
-                      onChange={(e) => setCommitmentData(prev => ({ ...prev, content: e.target.value }))}
-                      rows={4}
-                      className="w-full px-3 py-2 text-sm rounded-lg border-2 border-[#DC2626] focus:ring-2 focus:ring-[#DC2626] focus:border-[#DC2626] resize-none"
-                    />
-                  </div>
-
-                  {/* Signature preview */}
-                  <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg p-4">
-                    <div className="flex items-start gap-3">
-                      <Lock size={16} className="text-[#6B7280] mt-0.5" />
-                      <div>
-                        <div className="text-sm font-medium text-[#111827] mb-1">
-                          Người cam kết: {ownerInfo.name}
-                        </div>
-                        <div className="text-xs text-[#6B7280] mb-1">
-                          Chức danh: Chuyên viên — {ownerInfo.department}
-                        </div>
-                        <div className="text-xs text-[#9CA3AF] flex items-center gap-1">
-                          <Lock size={12} />
-                          Chữ ký tự động từ tài khoản
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Create commitment button */}
-                  <button
-                    onClick={handleCreateCommitment}
-                    disabled={!isCommitmentValid || !hasSignature}
-                    className="w-full h-12 px-6 bg-[#D97706] text-white rounded-lg text-sm font-semibold hover:bg-[#B45309] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {!hasSignature ? (
-                      <>
-                        <Lock size={16} />
-                        Cần thiết lập chữ ký trước
-                      </>
-                    ) : (
-                      <>
-                        <Send size={16} />
-                        Tạo cam kết và gửi duyệt đặc biệt
-                      </>
-                    )}
-                  </button>
+              <div className="h-3 bg-[#E5E7EB] rounded-full overflow-hidden mb-3">
+                <div
+                  className="h-full bg-[#16A34A] transition-all"
+                  style={{ width: `${completionPercent}%` }}
+                />
+              </div>
+              {isChecklistComplete ? (
+                <div className="flex items-center gap-2 text-sm text-[#16A34A] font-medium">
+                  <Check size={16} /> Đủ hồ sơ pháp lý
                 </div>
               ) : (
-                // Commitment created confirmation
-                <div className="bg-[#FEF3C7] border border-[#F59E0B] rounded-lg p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Check size={20} className="text-[#F59E0B]" />
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold text-[#92400E]">
-                        ✓ Đã tạo cam kết bổ sung hồ sơ
-                      </div>
-                      <div className="text-xs text-[#78350F] mt-1">
-                        Cam kết bổ sung trước: {commitmentData.deadline} — Người cam kết: {ownerInfo.name}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-[#92400E] bg-[#FFFBEB] border border-[#FDE68A] rounded p-3">
-                    {commitmentData.content.replace('[date]', commitmentData.deadline)}
-                  </div>
-                  <button
-                    onClick={() => setHasCommitment(false)}
-                    className="mt-3 text-xs text-[#D97706] hover:underline"
-                  >
-                    Hủy cam kết và chỉnh sửa lại
-                  </button>
+                <div className="flex items-center gap-2 text-sm text-[#DC2626] font-medium">
+                  <AlertTriangle size={16} /> Chưa đủ hồ sơ — cần bổ sung hoặc tạo cam kết
                 </div>
               )}
             </div>
-          )}
 
-          {/* Info about commitment */}
-          {!isChecklistComplete && canEdit && !hasCommitment && (
-            <div className="bg-[#F0F9FF] border border-[#93C5FD] rounded-lg p-4 flex items-start gap-3">
-              <AlertCircle size={16} className="text-[#1D4ED8] flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-[#1E40AF]">
-                <strong>Lưu ý:</strong> Cam kết bổ sung hồ sơ sẽ được chuyển đến Phó Giám đốc để duyệt đặc biệt. 
-                Bạn cần hoàn thành bổ sung hồ sơ đúng hạn cam kết.
+            {legalCatalogQ.isLoading && (
+              <div className="bg-white border border-[#E5E7EB] rounded-xl py-12 flex items-center justify-center gap-2 text-[#6B7280]">
+                <Loader2 size={20} className="animate-spin" /> Đang tải danh mục pháp lý…
               </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: XEM TRƯỚC HĐ */}
-      {activeTab === 'preview' && (
-        <div className="bg-white border border-[#E5E7EB] rounded-xl p-8">
-          <div className="max-w-3xl mx-auto">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-[#111827] mb-2">HÓA ĐƠN GIÁ TRỊ GIA TĂNG</h2>
-              <p className="text-sm text-[#6B7280]">(Bản xem trước)</p>
-            </div>
-            
-            <div className="space-y-6 text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="font-medium text-[#111827] mb-1">Đơn vị bán hàng:</div>
-                  <div className="text-[#6B7280]">Công ty Viettel Tech Services</div>
-                  <div className="text-[#6B7280]">MST: 0100000000</div>
+            )}
+            {legalCatalogQ.isError && (
+              <div className="bg-white border border-red-200 rounded-xl py-8 text-center text-sm text-red-700">
+                Không tải được danh mục pháp lý.
+              </div>
+            )}
+            {!legalCatalogQ.isLoading && !legalCatalogQ.isError && requiredDocs.length === 0 && (
+              <div className="bg-white border border-[#E5E7EB] rounded-xl py-12 text-center text-sm text-[#6B7280]">
+                Chưa có danh mục hồ sơ pháp lý nào được cấu hình.
+              </div>
+            )}
+            {!legalCatalogQ.isLoading && !legalCatalogQ.isError && requiredDocs.length > 0 && (
+              <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
+                <div className="p-6 space-y-3">
+                  {requiredDocs.map((doc) => {
+                    const attached = attachments[doc.id];
+                    const checked = !!checkedDocs[doc.id];
+                    return (
+                      <div
+                        key={doc.id}
+                        className="flex items-start gap-3 p-3 rounded-lg bg-[#F9FAFB] hover:bg-[#F3F4F6] transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!canEdit}
+                          onChange={() =>
+                            setCheckedDocs((p) => ({ ...p, [doc.id]: !p[doc.id] }))
+                          }
+                          className={`mt-1 w-5 h-5 rounded border-[#D1D5DB] text-[#EE0033] focus:ring-[#EE0033] ${
+                            !canEdit ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                          }`}
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-[#111827]">
+                              {doc.name}
+                              {doc.group && (
+                                <span className="ml-2 text-xs text-[#6B7280]">[{doc.group}]</span>
+                              )}
+                            </span>
+                            {checked ? (
+                              <span className="text-xs px-2 py-1 rounded-full bg-[#D1FAE5] text-[#065F46] font-medium">
+                                ✓ Đã có
+                              </span>
+                            ) : (
+                              <span className="text-xs px-2 py-1 rounded-full bg-[#F3F4F6] text-[#6B7280] font-medium">
+                                Chưa có
+                              </span>
+                            )}
+                          </div>
+                          {attached?.file && (
+                            <div className="flex items-center gap-2 text-xs text-[#374151] mt-1">
+                              <span className="truncate">{attached.file.name}</span>
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeAttachment(doc.id)}
+                                  className="text-[#DC2626] hover:underline flex items-center gap-1"
+                                >
+                                  <Trash2 size={12} /> Xoá
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {canEdit && !attached?.file && (
+                            <button
+                              type="button"
+                              onClick={() => handleFilePick(doc.id, doc.name)}
+                              className="text-xs text-[#EE0033] hover:underline flex items-center gap-1 mt-1"
+                            >
+                              <Upload size={12} /> Tải lên file
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div>
-                  <div className="font-medium text-[#111827] mb-1">Người mua hàng:</div>
-                  <div className="text-[#6B7280]">Tập đoàn VNPT</div>
-                  <div className="text-[#6B7280]">MST: 0100109106</div>
-                </div>
               </div>
+            )}
 
-              <table className="w-full border border-[#E5E7EB]">
-                <thead>
-                  <tr className="bg-[#F3F4F6]">
-                    <th className="border border-[#E5E7EB] px-4 py-2 text-left">Tên hàng hóa, dịch vụ</th>
-                    <th className="border border-[#E5E7EB] px-4 py-2 text-right">Đơn giá</th>
-                    <th className="border border-[#E5E7EB] px-4 py-2 text-right">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="border border-[#E5E7EB] px-4 py-2">Tích hợp hệ thống quản lý doanh nghiệp ERP</td>
-                    <td className="border border-[#E5E7EB] px-4 py-2 text-right">2.450.000.000</td>
-                    <td className="border border-[#E5E7EB] px-4 py-2 text-right">2.450.000.000</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-[#E5E7EB] px-4 py-2 text-right font-medium" colSpan={2}>Cộng tiền hàng:</td>
-                    <td className="border border-[#E5E7EB] px-4 py-2 text-right font-medium">2.450.000.000</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-[#E5E7EB] px-4 py-2 text-right font-medium" colSpan={2}>Thuế GTGT (10%):</td>
-                    <td className="border border-[#E5E7EB] px-4 py-2 text-right font-medium">245.000.000</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-[#E5E7EB] px-4 py-2 text-right font-bold" colSpan={2}>Tổng cộng:</td>
-                    <td className="border border-[#E5E7EB] px-4 py-2 text-right font-bold">2.695.000.000</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div className="text-center text-xs text-[#9CA3AF] pt-4 border-t border-[#E5E7EB]">
-                Đây là bản xem trước. Hoá đơn chính thức sẽ được xuất sau khi phê duyệt.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: NHẬT KÝ HOẠT ĐỘNG */}
-      {activeTab === 'activity' && (
-        <div className="space-y-6">
-          {/* Header with filters */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold text-[#111827] flex items-center gap-2">
-                  <Clock size={20} className="text-[#EE0033]" />
-                  Nhật ký hoạt động
-                </h2>
-                <p className="text-sm text-[#6B7280] mt-1">Theo dõi toàn bộ lịch sử thay đổi và hành động</p>
-              </div>
-              <button className="h-9 px-4 bg-white border border-[#D1D5DB] text-[#374151] rounded-lg text-sm font-medium hover:bg-[#F3F4F6] flex items-center gap-2">
-                <Download size={14} />
-                Xuất nhật ký
-              </button>
-            </div>
-
-            {/* Filters */}
-            <div className="flex gap-3">
-              <select className="h-9 px-3 pr-8 border border-[#D1D5DB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033] appearance-none bg-white">
-                <option>Tất cả hành động</option>
-                <option>Tạo mới</option>
-                <option>Chỉnh sửa</option>
-                <option>Phê duyệt</option>
-                <option>Từ chối</option>
-              </select>
-              <select className="h-9 px-3 pr-8 border border-[#D1D5DB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033] appearance-none bg-white">
-                <option>Tất cả người dùng</option>
-                <option>Nguyễn Văn A</option>
-                <option>Trần Thị B</option>
-              </select>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Chọn khoảng thời gian"
-                  className="h-9 pl-9 pr-3 border border-[#D1D5DB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033] w-48"
-                />
-                <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-              </div>
-            </div>
-          </div>
-
-          {/* Activity Timeline */}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-6">
-            <div className="relative">
-              {/* Vertical line */}
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-[#E5E7EB]"></div>
-
-              <div className="space-y-0">
-                {/* Entry 10: System action */}
-                <div className="relative pl-12 pb-6">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#1D4ED8] border-2 border-white"></div>
+            {/* Commitment */}
+            {canEdit && !isChecklistComplete && totalChecklistItems > 0 && (
+              <div className="bg-[#FEF2F2] border-l-4 border-[#DC2626] rounded-lg p-6">
+                <div className="flex items-start gap-3 mb-4">
+                  <AlertTriangle size={24} className="text-[#DC2626] flex-shrink-0 mt-1" />
                   <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <Zap size={14} className="text-[#1D4ED8]" />
-                      Đẩy sang S-Invoice — Hệ thống
-                    </div>
-                    <p className="text-[13px] text-[#6B7280] mb-1">
-                      Tự động chuyển sang S-Invoice sau phê duyệt
+                    <h3 className="text-lg font-semibold text-[#DC2626] mb-2">
+                      Hồ sơ pháp lý chưa đầy đủ
+                    </h3>
+                    <p className="text-sm text-[#7F1D1D] leading-relaxed">
+                      Bạn có thể tạo <strong>Cam kết bổ sung</strong> để gửi đề nghị ngay. Đề
+                      nghị sẽ được chuyển duyệt đặc biệt.
                     </p>
-                    <div className="text-xs text-[#9CA3AF]">13/03/2026 15:43:00 — IP: Hệ thống</div>
                   </div>
                 </div>
-
-                {/* Entry 9: Approval with signature */}
-                <div className="relative pl-12 pb-6">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white"></div>
-                  <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <Check size={14} className="text-[#16A34A]" />
-                      Duyệt — Trần Thị B
+                {!hasCommitment ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[#7F1D1D] mb-1.5">
+                        Cam kết bổ sung trước ngày <span className="text-[#DC2626]">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        min={getTodayString()}
+                        value={commitmentDeadline}
+                        onChange={(e) => setCommitmentDeadline(e.target.value)}
+                        className="w-full h-10 px-3 text-sm rounded-lg border-2 border-[#DC2626] focus:ring-2 focus:ring-[#DC2626]"
+                      />
                     </div>
-                    <p className="text-[13px] text-[#6B7280] mb-2">
-                      Ghi chú: Đã soát xét đầy đủ, chuyển xuất HĐ.
-                    </p>
-                    <div className="flex items-center gap-3 mb-1">
-                      <div className="text-xs text-[#9CA3AF]">13/03/2026 15:42:30 — IP: 10.0.1.45</div>
-                      <div className="px-2 py-0.5 bg-[#F3F4F6] border border-[#D1D5DB] rounded text-[9px] text-[#6B7280] font-mono">
-                        Trần Thị B
+                    <div>
+                      <label className="block text-sm font-medium text-[#7F1D1D] mb-1.5">
+                        Lý do cam kết <span className="text-[#DC2626]">*</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={commitmentReason}
+                        onChange={(e) => setCommitmentReason(e.target.value)}
+                        placeholder="Nêu rõ lý do và nội dung cam kết bổ sung…"
+                        className="w-full px-3 py-2 text-sm rounded-lg border-2 border-[#DC2626] focus:ring-2 focus:ring-[#DC2626] resize-none"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!commitmentDeadline || commitmentReason.trim().length < 3) {
+                          alert('Vui lòng điền thời hạn và lý do cam kết (tối thiểu 3 ký tự).');
+                          return;
+                        }
+                        setHasCommitment(true);
+                      }}
+                      className="h-10 px-6 bg-[#D97706] text-white rounded-lg text-sm font-semibold hover:bg-[#B45309] flex items-center gap-2"
+                    >
+                      <Send size={16} /> Tạo cam kết
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-[#FEF3C7] border border-[#F59E0B] rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Check size={20} className="text-[#F59E0B]" />
+                      <div className="text-sm font-semibold text-[#92400E]">
+                        Đã tạo cam kết — bổ sung trước {commitmentDeadline}
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* Entry 8: Re-submit */}
-                <div className="relative pl-12 pb-6">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#F59E0B] border-2 border-white"></div>
-                  <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <Send size={14} className="text-[#F59E0B]" />
-                      Gửi duyệt lại — Nguyễn Văn A
+                    <div className="text-xs text-[#92400E] bg-[#FFFBEB] border border-[#FDE68A] rounded p-3">
+                      {commitmentReason}
                     </div>
-                    <p className="text-[13px] text-[#6B7280] mb-1">
-                      Đã bổ sung đầy đủ hồ sơ theo yêu cầu
-                    </p>
-                    <div className="text-xs text-[#9CA3AF]">12/03/2026 14:30:15 — IP: 10.0.1.102</div>
+                    <button
+                      type="button"
+                      onClick={() => setHasCommitment(false)}
+                      className="mt-3 text-xs text-[#D97706] hover:underline"
+                    >
+                      Huỷ cam kết và chỉnh sửa
+                    </button>
                   </div>
+                )}
+                <div className="text-xs text-[#7F1D1D] mt-3 italic">
+                  Lưu ý: Cam kết hiện được lưu cục bộ và sẽ tạo thành Cam kết chính thức ở bước
+                  sau (Phase D). Backend cam kết yêu cầu loại hồ sơ cụ thể.
                 </div>
+              </div>
+            )}
+          </div>
+        )}
 
-                {/* Entry 7: Upload file */}
-                <div className="relative pl-12 pb-6">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#1D4ED8] border-2 border-white"></div>
-                  <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <Upload size={14} className="text-[#1D4ED8]" />
-                      Upload "BB nghiệm thu.pdf" — Nguyễn Văn A
-                    </div>
-                    <p className="text-[13px] text-[#6B7280] mb-1">
-                      Tải lên file Biên bản nghiệm thu
-                    </p>
-                    <div className="text-xs text-[#9CA3AF]">12/03/2026 14:00:42 — IP: 10.0.1.102</div>
-                  </div>
+        {/* TAB PREVIEW */}
+        {activeTab === 'preview' && (
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-8">
+            <div className="max-w-3xl mx-auto">
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold text-[#111827] mb-1">
+                  HOÁ ĐƠN GIÁ TRỊ GIA TĂNG
+                </h2>
+                <p className="text-xs text-[#6B7280]">(Bản xem trước)</p>
+              </div>
+              <div className="space-y-4 text-sm">
+                <div>
+                  <span className="text-[#6B7280]">Khách hàng:</span>{' '}
+                  <span className="font-medium text-[#111827]">
+                    {customers.find((c) => c.id === customerId)?.name ?? '—'}
+                  </span>
                 </div>
-
-                {/* Entry 6: Returned */}
-                <div className="relative pl-12 pb-6">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#DC2626] border-2 border-white"></div>
-                  <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <AlertTriangle size={14} className="text-[#DC2626]" />
-                      Trả lại bổ sung — Trần Thị B
-                    </div>
-                    <p className="text-[13px] text-[#6B7280] mb-1">
-                      Ghi chú: "Thiếu BB nghiệm thu"
-                    </p>
-                    <div className="text-xs text-[#9CA3AF]">11/03/2026 09:00:20 — IP: 10.0.1.45</div>
-                  </div>
+                <div>
+                  <span className="text-[#6B7280]">Loại hoá đơn:</span>{' '}
+                  <span className="font-medium text-[#111827]">
+                    {invoiceTypes.find((t) => t.id === watch('invoice_type_id'))?.name ?? '—'}
+                  </span>
                 </div>
-
-                {/* Entry 5: View */}
-                <div className="relative pl-12 pb-6">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#9CA3AF] border-2 border-white"></div>
-                  <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <Eye size={14} className="text-[#9CA3AF]" />
-                      Xem bởi Trần Thị B (Kế toán)
-                    </div>
-                    <p className="text-[13px] text-[#6B7280] mb-1">
-                      Đã xem chi tiết đề nghị
-                    </p>
-                    <div className="text-xs text-[#9CA3AF]">11/03/2026 08:30:10 — IP: 10.0.1.45</div>
-                  </div>
+                <div>
+                  <span className="text-[#6B7280]">Loại dịch vụ:</span>{' '}
+                  <span className="font-medium text-[#111827]">
+                    {serviceTypes.find((s) => s.id === watch('service_type_id'))?.name ?? '—'}
+                  </span>
                 </div>
-
-                {/* Entry 4: Submit for approval */}
-                <div className="relative pl-12 pb-6">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#F59E0B] border-2 border-white"></div>
-                  <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <Send size={14} className="text-[#F59E0B]" />
-                      Gửi duyệt — Nguyễn Văn A
-                    </div>
-                    <p className="text-[13px] text-[#6B7280] mb-1">
-                      Chuyển đề nghị sang trạng thái chờ phê duyệt
-                    </p>
-                    <div className="text-xs text-[#9CA3AF]">10/03/2026 14:15:30 — IP: 10.0.1.102</div>
-                  </div>
-                </div>
-
-                {/* Entry 3: Upload contract */}
-                <div className="relative pl-12 pb-6">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#1D4ED8] border-2 border-white"></div>
-                  <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <Upload size={14} className="text-[#1D4ED8]" />
-                      Upload "Hợp đồng đã ký.pdf" — Nguyễn Văn A
-                    </div>
-                    <p className="text-[13px] text-[#6B7280] mb-1">
-                      Tải lên file Hợp đồng đã ký
-                    </p>
-                    <div className="text-xs text-[#9CA3AF]">10/03/2026 10:20:15 — IP: 10.0.1.102</div>
-                  </div>
-                </div>
-
-                {/* Entry 2: Update settlement info */}
-                <div className="relative pl-12 pb-6">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#1D4ED8] border-2 border-white"></div>
-                  <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <Edit3 size={14} className="text-[#1D4ED8]" />
-                      Cập nhật thông tin quyết toán — Nguyễn Văn A
-                    </div>
-                    <p className="text-[13px] text-[#6B7280] mb-1">
-                      Sửa giá trị quyết toán và thông tin VAT
-                    </p>
-                    <div className="text-xs text-[#9CA3AF]">10/03/2026 10:15:20 — IP: 10.0.1.102</div>
-                  </div>
-                </div>
-
-                {/* Entry 1: Created */}
-                <div className="relative pl-12">
-                  <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white"></div>
-                  <div>
-                    <div className="text-[14px] font-medium text-[#111827] mb-1 flex items-center gap-2">
-                      <Check size={14} className="text-[#16A34A]" />
-                      Tạo đề nghị — Nguyễn Văn A
-                    </div>
-                    <p className="text-[13px] text-[#6B7280] mb-1">
-                      Khởi tạo đề nghị xuất hoá đơn {requestId}
-                    </p>
-                    <div className="text-xs text-[#9CA3AF]">10/03/2026 09:30:00 — IP: 10.0.1.102</div>
-                  </div>
-                </div>
+                <table className="w-full border border-[#E5E7EB] mt-4">
+                  <tbody>
+                    <tr>
+                      <td className="border border-[#E5E7EB] px-4 py-2">Giá trị trước VAT</td>
+                      <td className="border border-[#E5E7EB] px-4 py-2 text-right">
+                        {formatVND(toNumber(amountBefore))} đ
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="border border-[#E5E7EB] px-4 py-2">
+                        Thuế GTGT ({toNumber(taxRate)}%)
+                      </td>
+                      <td className="border border-[#E5E7EB] px-4 py-2 text-right">
+                        {formatVND(toNumber(watch('vat_amount')))} đ
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="border border-[#E5E7EB] px-4 py-2 font-bold">Tổng cộng</td>
+                      <td className="border border-[#E5E7EB] px-4 py-2 text-right font-bold text-[#EE0033]">
+                        {formatVND(toNumber(watch('amount_after_vat')))} đ
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* BOTTOM ACTION BAR - Fixed */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E5E7EB] px-6 py-4 z-20">
-        <div className="max-w-[1440px] mx-auto flex items-center justify-between">
-          {canEdit ? (
-            <>
-              <button 
-                onClick={onBack}
-                className="h-10 px-6 text-sm font-medium text-[#6B7280] hover:text-[#374151] transition-colors"
-              >
-                Hủy
-              </button>
-              <div className="flex gap-3">
-                <button className="h-10 px-6 bg-white text-[#374151] border border-[#D1D5DB] rounded-lg text-sm font-medium hover:bg-[#F3F4F6] transition-colors">
-                  Lưu nháp
-                </button>
-                
-                {/* CRITICAL: THREE STATES FOR SUBMIT BUTTON */}
-                {isChecklistComplete ? (
-                  // STATE A: Checklist 100% - Normal submit (Red)
-                  <button 
-                    disabled={!hasSignature}
-                    className="h-10 px-6 bg-[#EE0033] text-white rounded-lg text-sm font-semibold hover:bg-[#CC002B] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    title={!hasSignature ? "Cần thiết lập chữ ký trước" : "Gửi phê duyệt"}
-                  >
-                    {!hasSignature && <Lock size={16} />}
-                    Gửi phê duyệt
-                  </button>
-                ) : hasCommitment ? (
-                  // STATE C: Checklist < 100% AND has commitment - Special submit (Amber)
-                  <button 
-                    disabled={!hasSignature}
-                    className="h-10 px-6 bg-[#D97706] text-white rounded-lg text-sm font-semibold hover:bg-[#B45309] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    title={!hasSignature ? "Cần thiết lập chữ ký trước" : "Gửi phê duyệt đặc biệt với cam kết"}
-                  >
-                    {!hasSignature ? <Lock size={16} /> : <Send size={16} />}
-                    Gửi duyệt đặc biệt (có cam kết)
-                  </button>
-                ) : (
-                  // STATE B: Checklist < 100% AND no commitment - DISABLED (Gray)
-                  <button 
+        {/* BOTTOM ACTION BAR */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E5E7EB] px-6 py-4 z-20">
+          <div className="max-w-[1440px] mx-auto flex items-center justify-between">
+            <button
+              type="button"
+              onClick={onBack}
+              className="h-10 px-6 text-sm font-medium text-[#6B7280] hover:text-[#374151]"
+            >
+              {canEdit ? 'Huỷ' : 'Quay lại'}
+            </button>
+
+            {uploadProgress && (
+              <div className="text-xs text-[#6B7280] flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin" /> {uploadProgress}
+              </div>
+            )}
+
+            {canEdit && (
+              <div className="flex gap-3 items-center">
+                <span className="text-xs text-[#6B7280] flex items-center gap-2">
+                  <span>Tạo bởi:</span>
+                  <span className="font-medium text-[#111827]">{ownerName}</span>
+                  <span>•</span>
+                  <span>{ownerDept}</span>
+                </span>
+                {!canSubmitForApproval ? (
+                  <button
+                    type="button"
                     disabled
                     className="h-10 px-6 bg-[#9CA3AF] text-white rounded-lg text-sm font-semibold cursor-not-allowed flex items-center gap-2"
-                    title="Cần đủ hồ sơ hoặc tạo cam kết bổ sung"
+                    title="Cần đủ hồ sơ hoặc tạo cam kết"
                   >
-                    <Lock size={16} />
-                    Gửi phê duyệt
+                    <Lock size={16} /> Gửi phê duyệt
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || createMut.isPending}
+                    className={`h-10 px-6 text-white rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isChecklistComplete
+                        ? 'bg-[#EE0033] hover:bg-[#CC002B]'
+                        : 'bg-[#D97706] hover:bg-[#B45309]'
+                    }`}
+                  >
+                    {(isSubmitting || createMut.isPending) && (
+                      <Loader2 size={16} className="animate-spin" />
+                    )}
+                    <Send size={16} />
+                    {isChecklistComplete ? 'Tạo đề nghị' : 'Tạo đề nghị (có cam kết)'}
                   </button>
                 )}
               </div>
-            </>
-          ) : (
-            <>
-              <button 
-                onClick={onBack}
-                className="h-10 px-6 bg-white text-[#374151] border border-[#D1D5DB] rounded-lg text-sm font-medium hover:bg-[#F3F4F6] transition-colors flex items-center gap-2"
+            )}
+
+            {!canEdit && !isCreateMode && status === 'rejected' && (
+              <button
+                type="button"
+                className="h-10 px-6 bg-[#EE0033] text-white rounded-lg text-sm font-medium hover:bg-[#CC002B] flex items-center gap-2"
               >
-                <ArrowLeft size={16} />
-                Quay lại
+                <Copy size={16} /> Tạo đề nghị mới từ bản này
               </button>
-              {status === 'rejected' && isOwner && (
-                <button className="h-10 px-6 bg-[#EE0033] text-white rounded-lg text-sm font-medium hover:bg-[#CC002B] transition-colors flex items-center gap-2">
-                  <Copy size={16} />
-                  Tạo đề nghị mới từ bản này
-                </button>
-              )}
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

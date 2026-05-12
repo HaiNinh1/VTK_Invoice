@@ -66,4 +66,17 @@ class InvoiceRequestLegalDocumentController extends Controller
 
         return response()->noContent();
     }
+
+    public function download(InvoiceRequest $invoiceRequest, InvoiceRequestLegalDocument $document)
+    {
+        $this->authorize('view', $invoiceRequest);
+        abort_unless($document->invoice_request_id === $invoiceRequest->id, 404);
+        abort_unless(Storage::disk('local')->exists($document->file_path), 404);
+
+        return Storage::disk('local')->download(
+            $document->file_path,
+            $document->original_filename ?: basename($document->file_path),
+            ['Content-Type' => $document->mime_type ?: 'application/octet-stream']
+        );
+    }
 }

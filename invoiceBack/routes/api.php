@@ -80,6 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/contracts/{contract}/documents', [ContractController::class, 'documents']);
     Route::post('/contracts/{contract}/documents', [ContractController::class, 'storeDocument']);
     Route::delete('/contracts/{contract}/documents/{document}', [ContractController::class, 'destroyDocument']);
+    Route::get('/contracts/{contract}/documents/{document}/download', [ContractController::class, 'downloadDocument']);
     Route::post('/contracts/{contract}/installments/{installment}/create-invoice-request', [ContractController::class, 'createInvoiceRequest']);
 
     // Invoice requests CRUD
@@ -106,6 +107,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/invoice-requests/{invoiceRequest}/legal-documents', [InvoiceRequestLegalDocumentController::class, 'index']);
     Route::post('/invoice-requests/{invoiceRequest}/legal-documents', [InvoiceRequestLegalDocumentController::class, 'store']);
     Route::delete('/invoice-requests/{invoiceRequest}/legal-documents/{document}', [InvoiceRequestLegalDocumentController::class, 'destroy']);
+    Route::get('/invoice-requests/{invoiceRequest}/legal-documents/{document}/download', [InvoiceRequestLegalDocumentController::class, 'download']);
 
     Route::get('/invoice-requests/{invoiceRequest}/commitments', [CommitmentController::class, 'index']);
     Route::post('/invoice-requests/{invoiceRequest}/commitments', [CommitmentController::class, 'store'])

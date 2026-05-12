@@ -204,6 +204,22 @@ class ContractController extends Controller
         return response()->noContent();
     }
 
+    public function downloadDocument(Contract $contract, ContractDocument $document)
+    {
+        $this->authorize('view', $contract);
+
+        if ((int) $document->contract_id !== (int) $contract->id) {
+            abort(404);
+        }
+        abort_unless(Storage::disk('local')->exists($document->file_path), 404);
+
+        return Storage::disk('local')->download(
+            $document->file_path,
+            $document->original_filename ?: basename($document->file_path),
+            ['Content-Type' => $document->mime_type ?: 'application/octet-stream']
+        );
+    }
+
     public function createInvoiceRequest(
         Request $request,
         Contract $contract,

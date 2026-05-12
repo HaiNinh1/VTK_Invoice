@@ -12,6 +12,7 @@ import { authApi } from '../api/endpoints/auth';
 import { getStoredToken, setStoredToken } from '../api/client';
 import type { User } from '../api/types';
 import { ApiError } from '../api/errors';
+import { queryClient } from '../api/queryClient';
 
 type UserRole = 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
 
@@ -84,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStoredToken(null);
       setToken(null);
       setUser(null);
+      queryClient.clear();
     };
     window.addEventListener('auth:unauthorized', handler);
     return () => window.removeEventListener('auth:unauthorized', handler);
@@ -105,6 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStoredToken(null);
     setToken(null);
     setUser(null);
+    // Drop all cached server state so the next signed-in user starts clean.
+    queryClient.clear();
   }, []);
 
   const refresh = useCallback(async () => {

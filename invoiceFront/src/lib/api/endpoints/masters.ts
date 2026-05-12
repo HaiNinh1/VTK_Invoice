@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPost, apiPut, unwrap } from '../client';
 import type { Paginated } from '../types';
+import { saveDownload } from '../download';
 
 export interface Customer {
   id: number;
@@ -92,6 +93,13 @@ export const serviceTypesApi = {
     const raw = await apiGet<unknown>('/service-types', { params });
     return buildList<ServiceType>(raw);
   },
+  show: async (id: number) =>
+    unwrap<ServiceType>(await apiGet<unknown>(`/service-types/${id}`)),
+  create: async (p: Partial<ServiceType>) =>
+    unwrap<ServiceType>(await apiPost<unknown>('/service-types', p)),
+  update: async (id: number, p: Partial<ServiceType>) =>
+    unwrap<ServiceType>(await apiPut<unknown>(`/service-types/${id}`, p)),
+  destroy: (id: number) => apiDelete<void>(`/service-types/${id}`),
 };
 
 export const legalDocumentsCatalogApi = {
@@ -99,6 +107,13 @@ export const legalDocumentsCatalogApi = {
     const raw = await apiGet<unknown>('/legal-documents', { params });
     return buildList<LegalDocumentCatalog>(raw);
   },
+  show: async (id: number) =>
+    unwrap<LegalDocumentCatalog>(await apiGet<unknown>(`/legal-documents/${id}`)),
+  create: async (p: Partial<LegalDocumentCatalog>) =>
+    unwrap<LegalDocumentCatalog>(await apiPost<unknown>('/legal-documents', p)),
+  update: async (id: number, p: Partial<LegalDocumentCatalog>) =>
+    unwrap<LegalDocumentCatalog>(await apiPut<unknown>(`/legal-documents/${id}`, p)),
+  destroy: (id: number) => apiDelete<void>(`/legal-documents/${id}`),
 };
 
 export const contractsApi = {
@@ -157,5 +172,13 @@ export const contractsApi = {
     },
     destroy: (contractId: number, documentId: number) =>
       apiDelete<void>(`/contracts/${contractId}/documents/${documentId}`),
+    /**
+     * Auth-gated download. Returns the saved filename and triggers a browser save.
+     */
+    download: (contractId: number, documentId: number) =>
+      saveDownload(
+        `/contracts/${contractId}/documents/${documentId}/download`,
+        `contract-${contractId}-doc-${documentId}`
+      ),
   },
 };

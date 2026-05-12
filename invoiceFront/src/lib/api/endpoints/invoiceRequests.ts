@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPost, apiPut, unwrap } from '../client';
 import type { InvoiceRequest, Paginated } from '../types';
+import { saveDownload } from '../download';
 
 export interface InvoiceRequestFilters {
   status?: string | string[];
@@ -111,6 +112,14 @@ export const invoiceRequestsApi = {
     },
     destroy: (invoiceRequestId: number | string, documentId: number | string) =>
       apiDelete<void>(`/invoice-requests/${invoiceRequestId}/legal-documents/${documentId}`),
+    /**
+     * Auth-gated download. Returns the saved filename and triggers a browser save.
+     */
+    download: (invoiceRequestId: number | string, documentId: number | string) =>
+      saveDownload(
+        `/invoice-requests/${invoiceRequestId}/legal-documents/${documentId}/download`,
+        `invoice-${invoiceRequestId}-legal-${documentId}`
+      ),
   },
 };
 

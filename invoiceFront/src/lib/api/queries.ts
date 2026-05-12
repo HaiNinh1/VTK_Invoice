@@ -21,8 +21,27 @@ import {
   serviceTypesApi,
   legalDocumentsCatalogApi,
   contractsApi,
+  Customer,
+  InvoiceType,
+  ServiceType,
+  LegalDocumentCatalog,
+  Contract,
+  PaymentInstallment,
 } from './endpoints/masters';
 import { signatureApi } from './endpoints/signature';
+import {
+  commitmentsApi,
+  Commitment,
+  CreateCommitmentPayload,
+  ExtendCommitmentPayload,
+  DecideCommitmentPayload,
+} from './endpoints/commitments';
+import {
+  reportsApi,
+  LegalComplianceReport,
+  ApproveLegalReportPayload,
+} from './endpoints/reports';
+import { healthApi, HealthResponse } from './endpoints/health';
 import type { InvoiceRequest, Paginated, AppNotification } from './types';
 
 export const qk = {
@@ -262,3 +281,365 @@ export function useUnreadNotificationCount() {
 
 // Re-export AppNotification for convenience
 export type { AppNotification };
+
+// ============================================================================
+// Phase B7 additions — hooks for commitments, reports, health, admin writes,
+// contract installments/documents, invoice-request legal documents.
+// ============================================================================
+
+// Local key extensions (cache shapes align with src/lib/api/queryKeys.ts).
+const k = {
+  commitments: (invoiceRequestId: number | string) =>
+    ['invoice-request', String(invoiceRequestId), 'commitments'] as const,
+  commitment: (id: number | string) => ['commitment', String(id)] as const,
+  contractInstallments: (contractId: number) =>
+    ['contract', contractId, 'installments'] as const,
+  contractDocuments: (contractId: number) =>
+    ['contract', contractId, 'documents'] as const,
+  invoiceRequestLegalDocs: (id: number | string) =>
+    ['invoice-request', String(id), 'legal-documents'] as const,
+  legalComplianceReport: (params?: Record<string, unknown>) =>
+    ['reports', 'legal-compliance', params] as const,
+  health: ['health'] as const,
+};
+
+// ---------- commitments ----------
+export function useCommitmentsForInvoiceRequest(invoiceRequestId: number | string | null) {
+  return useQuery<Commitment[]>({
+    queryKey: invoiceRequestId ? k.commitments(invoiceRequestId) : ['commitments', 'null'],
+    queryFn: () => commitmentsApi.listForInvoiceRequest(invoiceRequestId!),
+    enabled: !!invoiceRequestId,
+  });
+}
+
+export function useCommitment(id: number | string | null) {
+  return useQuery<Commitment>({
+    queryKey: id ? k.commitment(id) : ['commitment', 'null'],
+    queryFn: () => commitmentsApi.show(id!),
+    enabled: !!id,
+  });
+}
+
+export function useCreateCommitment(invoiceRequestId: number | string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateCommitmentPayload) =>
+      commitmentsApi.create(invoiceRequestId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: k.commitments(invoiceRequestId) });
+      qc.invalidateQueries({ queryKey: qk.invoiceRequest(invoiceRequestId) });
+      qc.invalidateQueries({ queryKey: qk.invoiceRequestTimeline(invoiceRequestId) });
+    },
+  });
+}
+
+export function useExtendCommitment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number | string; payload: ExtendCommitmentPayload }) =>
+      commitmentsApi.extend(id, payload),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: k.commitment(vars.id) });
+      qc.invalidateQueries({ queryKey: ['invoice-request'] });
+    },
+  });
+}
+
+export function useDecideCommitment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number | string; payload: DecideCommitmentPayload }) =>
+      commitmentsApi.decide(id, payload),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: k.commitment(vars.id) });
+      qc.invalidateQueries({ queryKey: ['invoice-request'] });
+      qc.invalidateQueries({ queryKey: ['approvals', 'pending'] });
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useRemindCommitment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number | string) => commitmentsApi.remind(id),
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: k.commitment(id) });
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+// ---------- reports ----------
+export function useLegalComplianceReport(params?: Record<string, unknown>) {
+  return useQuery<LegalComplianceReport>({
+    queryKey: k.legalComplianceReport(params),
+    queryFn: () => reportsApi.legalCompliance.get(params),
+    staleTime: 60_000,
+  });
+}
+
+export function useApproveLegalReport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload?: ApproveLegalReportPayload) =>
+      reportsApi.legalCompliance.approve(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reports', 'legal-compliance'] });
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+// ---------- health ----------
+export function useHealth(opts?: Omit<UseQueryOptions<HealthResponse>, 'queryKey' | 'queryFn'>) {
+  return useQuery<HealthResponse>({
+    queryKey: k.health,
+    queryFn: healthApi.get,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+// ---------- customers (writes) ----------
+export function useCreateCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<Customer>) => customersApi.create(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+  });
+}
+export function useUpdateCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Partial<Customer> }) =>
+      customersApi.update(id, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+  });
+}
+
+// ---------- invoice types (admin writes) ----------
+export function useCreateInvoiceType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<InvoiceType>) => invoiceTypesApi.create(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoice-types'] }),
+  });
+}
+export function useUpdateInvoiceType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Partial<InvoiceType> }) =>
+      invoiceTypesApi.update(id, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoice-types'] }),
+  });
+}
+export function useDeleteInvoiceType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => invoiceTypesApi.destroy(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoice-types'] }),
+  });
+}
+export function useToggleInvoiceTypeStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => invoiceTypesApi.toggleStatus(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoice-types'] }),
+  });
+}
+
+// ---------- service types (admin writes) ----------
+export function useCreateServiceType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<ServiceType>) => serviceTypesApi.create(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['service-types'] }),
+  });
+}
+export function useUpdateServiceType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Partial<ServiceType> }) =>
+      serviceTypesApi.update(id, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['service-types'] }),
+  });
+}
+export function useDeleteServiceType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => serviceTypesApi.destroy(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['service-types'] }),
+  });
+}
+
+// ---------- legal documents catalog (admin writes) ----------
+export function useCreateLegalDocCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<LegalDocumentCatalog>) =>
+      legalDocumentsCatalogApi.create(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['legal-documents-catalog'] }),
+  });
+}
+export function useUpdateLegalDocCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Partial<LegalDocumentCatalog> }) =>
+      legalDocumentsCatalogApi.update(id, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['legal-documents-catalog'] }),
+  });
+}
+export function useDeleteLegalDocCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => legalDocumentsCatalogApi.destroy(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['legal-documents-catalog'] }),
+  });
+}
+
+// ---------- contracts (writes) ----------
+export function useCreateContract() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<Contract>) => contractsApi.create(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contracts'] }),
+  });
+}
+export function useUpdateContract() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Partial<Contract> }) =>
+      contractsApi.update(id, payload),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['contracts'] });
+      qc.invalidateQueries({ queryKey: qk.contract(vars.id) });
+    },
+  });
+}
+export function useDeleteContract() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => contractsApi.destroy(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contracts'] }),
+  });
+}
+
+// ---------- contract installments ----------
+export function useContractInstallments(contractId: number | null) {
+  return useQuery<PaymentInstallment[]>({
+    queryKey: contractId ? k.contractInstallments(contractId) : ['contract', 'null', 'installments'],
+    queryFn: () => contractsApi.installments.list(contractId!),
+    enabled: !!contractId,
+  });
+}
+export function useCreateInstallment(contractId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<PaymentInstallment>) =>
+      contractsApi.installments.create(contractId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: k.contractInstallments(contractId) });
+      qc.invalidateQueries({ queryKey: qk.contract(contractId) });
+    },
+  });
+}
+export function useUpdateInstallment(contractId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Partial<PaymentInstallment> }) =>
+      contractsApi.installments.update(contractId, id, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: k.contractInstallments(contractId) });
+      qc.invalidateQueries({ queryKey: qk.contract(contractId) });
+    },
+  });
+}
+export function useDeleteInstallment(contractId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => contractsApi.installments.destroy(contractId, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: k.contractInstallments(contractId) });
+      qc.invalidateQueries({ queryKey: qk.contract(contractId) });
+    },
+  });
+}
+export function useCreateInvoiceFromInstallment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ contractId, installmentId }: { contractId: number; installmentId: number }) =>
+      contractsApi.installments.createInvoiceRequest(contractId, installmentId),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['invoice-requests'] });
+      qc.invalidateQueries({ queryKey: k.contractInstallments(vars.contractId) });
+      qc.invalidateQueries({ queryKey: qk.contract(vars.contractId) });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+// ---------- contract documents ----------
+export function useContractDocuments(contractId: number | null) {
+  return useQuery({
+    queryKey: contractId ? k.contractDocuments(contractId) : ['contract', 'null', 'documents'],
+    queryFn: () => contractsApi.documents.list(contractId!),
+    enabled: !!contractId,
+  });
+}
+export function useUploadContractDocument(contractId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, documentType }: { file: File; documentType?: string }) =>
+      contractsApi.documents.upload(contractId, file, documentType),
+    onSuccess: () => qc.invalidateQueries({ queryKey: k.contractDocuments(contractId) }),
+  });
+}
+export function useDeleteContractDocument(contractId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (documentId: number) => contractsApi.documents.destroy(contractId, documentId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: k.contractDocuments(contractId) }),
+  });
+}
+
+// ---------- invoice request legal documents ----------
+export function useInvoiceRequestLegalDocuments(invoiceRequestId: number | string | null) {
+  return useQuery({
+    queryKey: invoiceRequestId
+      ? k.invoiceRequestLegalDocs(invoiceRequestId)
+      : ['invoice-request', 'null', 'legal-documents'],
+    queryFn: () => invoiceRequestsApi.legalDocuments.list(invoiceRequestId!),
+    enabled: !!invoiceRequestId,
+  });
+}
+export function useUploadInvoiceRequestLegalDocument(invoiceRequestId: number | string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      file,
+      legalDocumentId,
+      notes,
+    }: {
+      file: File;
+      legalDocumentId: number;
+      notes?: string;
+    }) =>
+      invoiceRequestsApi.legalDocuments.upload(invoiceRequestId, file, legalDocumentId, notes),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: k.invoiceRequestLegalDocs(invoiceRequestId) });
+      qc.invalidateQueries({ queryKey: qk.invoiceRequest(invoiceRequestId) });
+    },
+  });
+}
+export function useDeleteInvoiceRequestLegalDocument(invoiceRequestId: number | string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (documentId: number) =>
+      invoiceRequestsApi.legalDocuments.destroy(invoiceRequestId, documentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: k.invoiceRequestLegalDocs(invoiceRequestId) });
+      qc.invalidateQueries({ queryKey: qk.invoiceRequest(invoiceRequestId) });
+    },
+  });
+}

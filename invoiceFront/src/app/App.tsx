@@ -32,6 +32,7 @@ import InvoiceTypeManagement from './components/InvoiceTypeManagement';
 import ContractManagement from './components/ContractManagement';
 import { useAuth } from '../lib/auth/AuthProvider';
 import { useNotifications, useUnreadNotificationCount } from '../lib/api/queries';
+import { useActiveNav } from './useActiveNav';
 
 // Demo role switcher is hidden in real auth flows; enable via VITE_ENABLE_DEMO_ROLE_SWITCHER=true
 const SHOW_DEMO_ROLE_SWITCHER = import.meta.env.VITE_ENABLE_DEMO_ROLE_SWITCHER === 'true';
@@ -77,7 +78,7 @@ export default function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [activeNav, setActiveNav] = useState('dashboard');
+  const [activeNav, setActiveNav] = useActiveNav();
   const [filterExpanded, setFilterExpanded] = useState(true);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);

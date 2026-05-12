@@ -94,12 +94,40 @@ class InvoiceTypeCrudTest extends TestCase
             ->assertStatus(409);
     }
 
-    public function test_non_admin_without_catalog_manage_cannot_access_invoice_type_admin_routes(): void
+    public function test_non_admin_without_catalog_manage_can_read_but_cannot_write_invoice_types(): void
     {
         $employee = $this->makeUser('employee', 'KV3');
+        $existing = InvoiceType::firstOrFail();
 
+        // Catalog reads are open to any authenticated user (needed for dropdowns).
         $this->actingAs($employee, 'sanctum')
             ->getJson('/api/v1/invoice-types')
+            ->assertOk();
+
+        $this->actingAs($employee, 'sanctum')
+            ->getJson("/api/v1/invoice-types/{$existing->id}")
+            ->assertOk();
+
+        // Admin write routes must be forbidden for non-admins without catalog.manage.
+        $this->actingAs($employee, 'sanctum')
+            ->postJson('/api/v1/invoice-types', [
+                'code' => 'P4-IT-FORBIDDEN',
+                'name' => 'Forbidden',
+                'service_type_ids' => [],
+                'legal_documents' => [],
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($employee, 'sanctum')
+            ->putJson("/api/v1/invoice-types/{$existing->id}", ['name' => 'Forbidden'])
+            ->assertForbidden();
+
+        $this->actingAs($employee, 'sanctum')
+            ->postJson("/api/v1/invoice-types/{$existing->id}/toggle-status")
+            ->assertForbidden();
+
+        $this->actingAs($employee, 'sanctum')
+            ->deleteJson("/api/v1/invoice-types/{$existing->id}")
             ->assertForbidden();
     }
 
