@@ -7,14 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ContractDocument extends Model
 {
-    public $timestamps = false;
-
     protected $fillable = [
-        'contract_id', 'document_type', 'file_path', 'original_filename', 'file_size', 'uploaded_by_id', 'created_at',
+        'contract_id', 'document_type', 'file_path', 'original_filename', 'file_size', 'mime_type', 'uploaded_by_id',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function contract(): BelongsTo

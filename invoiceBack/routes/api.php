@@ -40,8 +40,19 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:report.view.company', 'require.signature');
 
     Route::get('/contracts', [ContractController::class, 'index']);
+    Route::post('/contracts', [ContractController::class, 'store']);
     Route::get('/contracts/{contract}', [ContractController::class, 'show']);
+    Route::put('/contracts/{contract}', [ContractController::class, 'update']);
+    Route::patch('/contracts/{contract}', [ContractController::class, 'update']);
+    Route::delete('/contracts/{contract}', [ContractController::class, 'destroy']);
     Route::get('/contracts/{contract}/installments', [ContractController::class, 'installments']);
+    Route::post('/contracts/{contract}/installments', [ContractController::class, 'storeInstallment']);
+    Route::put('/contracts/{contract}/installments/{installment}', [ContractController::class, 'updateInstallment']);
+    Route::patch('/contracts/{contract}/installments/{installment}', [ContractController::class, 'updateInstallment']);
+    Route::delete('/contracts/{contract}/installments/{installment}', [ContractController::class, 'destroyInstallment']);
+    Route::get('/contracts/{contract}/documents', [ContractController::class, 'documents']);
+    Route::post('/contracts/{contract}/documents', [ContractController::class, 'storeDocument']);
+    Route::delete('/contracts/{contract}/documents/{document}', [ContractController::class, 'destroyDocument']);
     Route::post('/contracts/{contract}/installments/{installment}/create-invoice-request', [ContractController::class, 'createInvoiceRequest']);
 
     // Invoice requests CRUD
