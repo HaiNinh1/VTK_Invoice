@@ -24,6 +24,7 @@ class RolePermissionSeeder extends Seeder
         'invoice.account',
         'contract.manage',
         'invoice_type.manage',
+        'catalog.manage',
         'user.manage',
         'report.view.center',
         'report.view.company',
