@@ -282,8 +282,8 @@ export default function CreateInvoiceRoleBased({
       const newId = (created as { id?: number })?.id;
 
       // Sequentially upload legal documents
-      const filesToUpload = Object.values(attachments).filter(
-        (a): a is PendingAttachment => !!a.file
+      const filesToUpload = (Object.values(attachments) as PendingAttachment[]).filter(
+        (a): a is PendingAttachment => !!a?.file
       );
       const uploadFailures: string[] = [];
       if (newId && filesToUpload.length > 0) {
@@ -294,7 +294,7 @@ export default function CreateInvoiceRoleBased({
             await invoiceRequestsApi.legalDocuments.upload(
               newId,
               a.file,
-              String(a.legalDocumentId)
+              a.legalDocumentId
             );
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Lỗi không xác định';

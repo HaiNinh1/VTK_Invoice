@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { 
   FileText, Clock, AlertTriangle, CheckCircle, TrendingUp, ArrowUpRight,
@@ -10,8 +11,8 @@ import {
 import { useMasterInvoiceData } from '../data/masterInvoiceData';
 
 interface DashboardManagerProps {
-  getStatusBadge: (status: string) => JSX.Element;
-  getLegalIcon: (legal: string) => JSX.Element;
+  getStatusBadge: (status: string) => ReactNode;
+  getLegalIcon: (legal: string) => ReactNode;
 }
 
 export default function DashboardManager({ getStatusBadge, getLegalIcon }: DashboardManagerProps) {

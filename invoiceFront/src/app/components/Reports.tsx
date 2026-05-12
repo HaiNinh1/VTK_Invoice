@@ -607,7 +607,7 @@ export default function Reports({ userRole = 'accountant' }: ReportsProps) {
                 <div className="text-[28px] font-bold text-[#16A34A]" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {legalStats.complete}
                 </div>
-                <div className="text-[13px] text-[#6B7280] mt-1">{legalStats.completePercentage}% tổng số</div>
+                <div className="text-[13px] text-[#6B7280] mt-1">{legalStats.total > 0 ? Math.round((legalStats.complete / legalStats.total) * 100) : 0}% tổng số</div>
               </div>
 
               <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">

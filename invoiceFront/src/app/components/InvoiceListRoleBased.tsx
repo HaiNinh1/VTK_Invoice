@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useState, useEffect } from 'react';
 import {
   FileSpreadsheet, Plus, Search, Filter, Calendar, X, ChevronDown,
@@ -11,8 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from './ui/button';
 
 interface InvoiceListRoleBasedProps {
-  getStatusBadge: (status: string) => JSX.Element;
-  getLegalIcon: (legal: string) => JSX.Element;
+  getStatusBadge: (status: string) => ReactNode;
+  getLegalIcon: (legal: string) => ReactNode;
   onCreateNew: () => void;
   userRole: 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
 }

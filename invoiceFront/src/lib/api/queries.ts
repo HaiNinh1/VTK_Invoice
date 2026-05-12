@@ -130,10 +130,10 @@ export function useCreateInvoiceRequest(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: invoiceRequestsApi.create,
-    onSuccess: (data, vars, ctx) => {
+    onSuccess: (...args) => {
       qc.invalidateQueries({ queryKey: ['invoice-requests'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
-      opts?.onSuccess?.(data, vars, ctx);
+      opts?.onSuccess?.(...args);
     },
     ...opts,
   });
@@ -625,7 +625,7 @@ export function useUploadInvoiceRequestLegalDocument(invoiceRequestId: number | 
       legalDocumentId: number;
       notes?: string;
     }) =>
-      invoiceRequestsApi.legalDocuments.upload(invoiceRequestId, file, legalDocumentId, notes),
+      invoiceRequestsApi.legalDocuments.upload(String(invoiceRequestId), file, legalDocumentId, notes),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: k.invoiceRequestLegalDocs(invoiceRequestId) });
       qc.invalidateQueries({ queryKey: qk.invoiceRequest(invoiceRequestId) });

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { CheckCircle, AlertTriangle, XCircle, FileText, Loader } from 'lucide-react';
 import React from 'react';
 
@@ -90,7 +91,7 @@ export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
 type LegalStatus = 'complete' | 'missing' | 'overdue' | 'committed';
 
 interface LegalStatusConfig {
-  icon: JSX.Element;
+  icon: ReactNode;
   color: string;
   tooltip: string;
 }
@@ -163,7 +164,7 @@ const SINVOICE_STATUS_CONFIG: Record<SInvoiceStatus, {
   text: string;
   bg: string;
   textColor: string;
-  icon?: JSX.Element;
+  icon?: ReactNode;
 }> = {
   pending: {
     text: 'Chờ đẩy',
@@ -283,7 +284,7 @@ export function VFSStatusBadge({ status }: { status: VFSStatus }) {
 /**
  * Get status badge as JSX element (for backward compatibility)
  */
-export function getInvoiceStatusBadge(status: string): JSX.Element {
+export function getInvoiceStatusBadge(status: string): ReactNode {
   const statusMap: Record<string, InvoiceStatus> = {
     'draft': 'draft',
     'pending': 'pending',
@@ -302,7 +303,7 @@ export function getInvoiceStatusBadge(status: string): JSX.Element {
 /**
  * Get legal icon as JSX element (for backward compatibility)
  */
-export function getLegalStatusIcon(status: string, customTooltip?: string): JSX.Element {
+export function getLegalStatusIcon(status: string, customTooltip?: string): ReactNode {
   const statusMap: Record<string, LegalStatus> = {
     'complete': 'complete',
     'missing': 'missing',
@@ -317,7 +318,7 @@ export function getLegalStatusIcon(status: string, customTooltip?: string): JSX.
 /**
  * Get S-Invoice status badge as JSX element
  */
-export function getSInvoiceStatusBadge(status: string): JSX.Element {
+export function getSInvoiceStatusBadge(status: string): ReactNode {
   const statusMap: Record<string, SInvoiceStatus> = {
     'pending': 'pending',
     'processing': 'processing',
@@ -334,7 +335,7 @@ export function getSInvoiceStatusBadge(status: string): JSX.Element {
 /**
  * Get VFS status badge as JSX element
  */
-export function getVFSStatusBadge(status: string): JSX.Element {
+export function getVFSStatusBadge(status: string): ReactNode {
   const statusMap: Record<string, VFSStatus> = {
     'pending': 'pending',
     'processing': 'processing',

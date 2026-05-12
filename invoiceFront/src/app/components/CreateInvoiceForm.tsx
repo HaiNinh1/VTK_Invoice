@@ -76,7 +76,7 @@ export default function CreateInvoiceForm({
   const create = useCreateInvoiceRequest();
   const submit = useSubmitInvoiceRequest();
   const { data: signature } = useSignature();
-  const hasSignature = !!signature?.signature_image_url || !!signature?.has_signature;
+  const hasSignature = !!signature?.data_path;
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -105,9 +105,10 @@ export default function CreateInvoiceForm({
       service_type_id: Number(serviceTypeId),
       contract_id: contractId === '' ? null : Number(contractId),
       payment_installment_id: installmentId === '' ? null : Number(installmentId),
-      before_vat: beforeVAT,
+      amount_before_vat: beforeVAT,
       tax_rate: taxRate,
-      after_vat: afterVAT,
+      vat_amount: vatAmount,
+      amount_after_vat: afterVAT,
       notes: notes || undefined,
     };
   }

@@ -33,6 +33,7 @@ import ContractManagement from './components/ContractManagement';
 import { useAuth } from '../lib/auth/AuthProvider';
 import { useNotifications, useUnreadNotificationCount } from '../lib/api/queries';
 import { useActiveNav } from './useActiveNav';
+import { useTheme } from 'next-themes';
 
 // Demo role switcher is hidden in real auth flows; enable via VITE_ENABLE_DEMO_ROLE_SWITCHER=true
 const SHOW_DEMO_ROLE_SWITCHER = import.meta.env.VITE_ENABLE_DEMO_ROLE_SWITCHER === 'true';
@@ -77,7 +78,8 @@ export default function App() {
   const { count: unreadNotificationCount } = useUnreadNotificationCount();
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
+  const darkMode = resolvedTheme === 'dark';
   const [activeNav, setActiveNav] = useActiveNav();
   const [filterExpanded, setFilterExpanded] = useState(true);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
@@ -647,7 +649,7 @@ export default function App() {
 
                 {/* Theme Toggle */}
                 <button 
-                  onClick={() => setDarkMode(!darkMode)}
+                  onClick={() => setTheme(darkMode ? 'light' : 'dark')}
                   className="hidden md:block p-2 hover:bg-[#F3F4F6] rounded-lg transition-all duration-200"
                   title={darkMode ? "Chế độ sáng" : "Chế độ tối"}
                 >
@@ -942,7 +944,7 @@ export default function App() {
                       <DashboardManager getStatusBadge={getInvoiceStatusBadge} getLegalIcon={getLegalStatusIcon} />
                     )}
                     {['accountant', 'director', 'admin'].includes(userRole) && (
-                      <DashboardCompany getStatusBadge={getInvoiceStatusBadge} getLegalIcon={getLegalStatusIcon} userRole={userRole} />
+                      <DashboardCompany getStatusBadge={getInvoiceStatusBadge} getLegalIcon={getLegalStatusIcon} />
                     )}
                   </>
                 )}
@@ -1088,7 +1090,7 @@ export default function App() {
                 {userRole === 'employee' ? (
                   <DashboardEmployee getStatusBadge={getInvoiceStatusBadge} getLegalIcon={getLegalStatusIcon} />
                 ) : (
-                  <DashboardCompany getStatusBadge={getInvoiceStatusBadge} getLegalIcon={getLegalStatusIcon} userRole={userRole} />
+                  <DashboardCompany getStatusBadge={getInvoiceStatusBadge} getLegalIcon={getLegalStatusIcon} />
                 )}
               </>
             )}

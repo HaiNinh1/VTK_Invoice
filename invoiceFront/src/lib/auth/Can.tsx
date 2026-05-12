@@ -47,7 +47,7 @@ export function Can({
   requireAll = false,
   fallback = null,
   children,
-}: CanProps): JSX.Element {
+}: CanProps): ReactNode {
   const { user } = useAuth();
 
   let allowed = false;

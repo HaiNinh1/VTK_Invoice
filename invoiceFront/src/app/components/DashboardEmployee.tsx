@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react';
 import { FileText, Clock, AlertTriangle, CheckCircle, ArrowUpRight } from 'lucide-react';
 import { useMasterInvoiceData } from '../data/masterInvoiceData';
 
 interface DashboardEmployeeProps {
-  getStatusBadge: (status: string) => JSX.Element;
-  getLegalIcon: (legal: string) => JSX.Element;
+  getStatusBadge: (status: string) => ReactNode;
+  getLegalIcon: (legal: string) => ReactNode;
 }
 
 export default function DashboardEmployee({ getStatusBadge, getLegalIcon }: DashboardEmployeeProps) {

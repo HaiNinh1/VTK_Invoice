@@ -92,12 +92,14 @@ export const invoiceRequestsApi = {
     upload: async (
       invoiceRequestId: number | string,
       file: File,
-      documentType: string,
+      legalDocumentId: number,
+      notes?: string,
       onProgress?: (pct: number) => void
     ) => {
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('document_type', documentType);
+      fd.append('legal_document_id', String(legalDocumentId));
+      if (notes) fd.append('notes', notes);
       const raw = await apiPost<unknown>(
         `/invoice-requests/${invoiceRequestId}/legal-documents`,
         fd,
