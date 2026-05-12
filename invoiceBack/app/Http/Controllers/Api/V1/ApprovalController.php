@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\ApprovalStep;
 use App\Enums\InvoiceStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\InvoiceRequestResource;
@@ -20,24 +19,10 @@ class ApprovalController extends Controller
         $query = InvoiceRequest::query()
             ->with(['customer', 'creator', 'revenueCenter', 'invoiceType', 'serviceType']);
 
-        if ($user->can('invoice.approve.dept') && ! $user->can('invoice.approve.accountant')) {
+        if ($user->can('invoice.approve.accountant') && ! $user->can('invoice.approve.director')) {
             $query->where('status', InvoiceStatus::Pending->value);
-            if ($user->hasRole('manager')) {
-                $query->where('revenue_center_id', $user->revenue_center_id);
-            }
         } elseif ($user->can('invoice.approve.director')) {
-            // director sees pending-vpgd where accountant already approved
-            $query->where('status', InvoiceStatus::PendingVpgd->value)
-                ->whereHas('approvals', function ($q) {
-                    $q->where('step', ApprovalStep::Accountant->value)
-                        ->where('action', 'approved');
-                });
-        } elseif ($user->can('invoice.approve.accountant')) {
-            $query->where('status', InvoiceStatus::PendingVpgd->value)
-                ->whereDoesntHave('approvals', function ($q) {
-                    $q->where('step', ApprovalStep::Accountant->value)
-                        ->where('action', 'approved');
-                });
+            $query->where('status', InvoiceStatus::PendingVpgd->value);
         } else {
             $query->whereRaw('1 = 0');
         }

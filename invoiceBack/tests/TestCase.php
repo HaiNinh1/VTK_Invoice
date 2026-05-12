@@ -5,9 +5,11 @@ namespace Tests;
 use App\Models\Department;
 use App\Models\RevenueCenter;
 use App\Models\User;
+use App\Models\UserSignature;
 use Database\Seeders\CatalogSeeder;
 use Database\Seeders\DepartmentRevenueCenterSeeder;
 use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\SignatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
@@ -21,6 +23,7 @@ abstract class TestCase extends BaseTestCase
             RolePermissionSeeder::class,
             DepartmentRevenueCenterSeeder::class,
             CatalogSeeder::class,
+            SignatureSeeder::class,
         ]);
     }
 
@@ -39,6 +42,12 @@ abstract class TestCase extends BaseTestCase
             'revenue_center_id' => $rc?->id,
         ]);
         $user->assignRole($role);
+        UserSignature::create([
+            'user_id' => $user->id,
+            'method' => 'text',
+            'data_path' => "signatures/{$user->id}.txt",
+            'font_family' => 'sans',
+        ]);
 
         return $user;
     }

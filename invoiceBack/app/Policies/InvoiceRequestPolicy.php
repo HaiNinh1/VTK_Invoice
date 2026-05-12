@@ -38,11 +38,11 @@ class InvoiceRequestPolicy
         if (! $user->can('invoice.update')) {
             return false;
         }
-        if ($user->id !== $request->creator_id && ! $user->hasAnyRole(['admin', 'director'])) {
+        if ($user->id !== $request->creator_id && ! $user->hasRole('admin')) {
             return false;
         }
 
-        return in_array($request->status, [InvoiceStatus::Draft, InvoiceStatus::Rejected], true);
+        return in_array($request->status, [InvoiceStatus::Draft, InvoiceStatus::Returned], true);
     }
 
     public function delete(User $user, InvoiceRequest $request): bool

@@ -9,7 +9,7 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
-    /** Plan §5.3 — 16 permissions × 5 roles. */
+    /** P0+ role matrix aligned to frontend approval model. */
     public const PERMISSIONS = [
         'invoice.view.own',
         'invoice.view.center',
@@ -17,9 +17,9 @@ class RolePermissionSeeder extends Seeder
         'invoice.create',
         'invoice.update',
         'invoice.delete',
-        'invoice.approve.dept',
         'invoice.approve.accountant',
         'invoice.approve.director',
+        'invoice.return',
         'invoice.issue',
         'invoice.account',
         'contract.manage',
@@ -35,24 +35,18 @@ class RolePermissionSeeder extends Seeder
         ],
         'manager' => [
             'invoice.view.own', 'invoice.view.center',
-            'invoice.create', 'invoice.update',
-            'invoice.approve.dept',
             'report.view.center',
         ],
         'accountant' => [
-            'invoice.view.own', 'invoice.view.center', 'invoice.view.all',
-            'invoice.create', 'invoice.update',
-            'invoice.approve.accountant',
+            'invoice.view.own', 'invoice.view.all',
+            'invoice.approve.accountant', 'invoice.return',
             'invoice.issue', 'invoice.account',
-            'report.view.center', 'report.view.company',
+            'report.view.company',
         ],
         'director' => [
-            'invoice.view.own', 'invoice.view.center', 'invoice.view.all',
-            'invoice.create', 'invoice.update', 'invoice.delete',
-            'invoice.approve.dept', 'invoice.approve.accountant', 'invoice.approve.director',
-            'invoice.issue', 'invoice.account',
-            'contract.manage', 'invoice_type.manage',
-            'report.view.center', 'report.view.company',
+            'invoice.view.own', 'invoice.view.all',
+            'invoice.approve.director', 'invoice.return',
+            'report.view.company',
         ],
         'admin' => self::PERMISSIONS,
     ];

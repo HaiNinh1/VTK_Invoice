@@ -6,6 +6,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -52,6 +53,11 @@ class User extends Authenticatable
     public function invoiceRequests(): HasMany
     {
         return $this->hasMany(InvoiceRequest::class, 'creator_id');
+    }
+
+    public function signature(): HasOne
+    {
+        return $this->hasOne(UserSignature::class);
     }
 
     /** Role helper aliases (string name). */

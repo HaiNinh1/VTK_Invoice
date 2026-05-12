@@ -16,6 +16,8 @@ class DatabaseSeeder extends Seeder
             DepartmentRevenueCenterSeeder::class,
             UserSeeder::class,
             CatalogSeeder::class,
+            ContractSeeder::class,
+            SignatureSeeder::class,
             InvoiceRequestSeeder::class,
         ]);
     }

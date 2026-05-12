@@ -6,10 +6,11 @@ enum InvoiceStatus: string
 {
     case Draft = 'draft';
     case Pending = 'pending';
-    case PendingVpgd = 'pending-vpgd';
+    case PendingVpgd = 'pending_vpgd';
     case Approved = 'approved';
     case Issued = 'issued';
     case Rejected = 'rejected';
+    case Returned = 'returned';
     case Accounted = 'accounted';
 
     /**
@@ -20,12 +21,13 @@ enum InvoiceStatus: string
     public function next(): array
     {
         return match ($this) {
-            self::Draft => [self::Pending],
-            self::Pending => [self::PendingVpgd, self::Rejected],
-            self::PendingVpgd => [self::Approved, self::Rejected],
+            self::Draft => [self::Pending, self::PendingVpgd],
+            self::Pending => [self::Approved, self::Rejected, self::Returned],
+            self::PendingVpgd => [self::Approved, self::Rejected, self::Returned],
             self::Approved => [self::Issued],
             self::Issued => [self::Accounted],
-            self::Rejected => [self::Draft, self::Pending],
+            self::Rejected => [],
+            self::Returned => [self::Pending, self::PendingVpgd],
             self::Accounted => [],
         };
     }

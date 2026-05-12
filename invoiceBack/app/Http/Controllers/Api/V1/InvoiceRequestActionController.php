@@ -33,4 +33,22 @@ class InvoiceRequestActionController extends Controller
 
         return new InvoiceRequestResource($updated);
     }
+
+    public function return(ApprovalActionRequest $request, InvoiceRequest $invoiceRequest): InvoiceRequestResource
+    {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+        ]);
+
+        $updated = $this->approvals->returnForSupplement($invoiceRequest, $request->user(), $validated['reason']);
+
+        return new InvoiceRequestResource($updated);
+    }
+
+    public function resubmit(Request $request, InvoiceRequest $invoiceRequest): InvoiceRequestResource
+    {
+        $updated = $this->approvals->submit($invoiceRequest, $request->user());
+
+        return new InvoiceRequestResource($updated);
+    }
 }

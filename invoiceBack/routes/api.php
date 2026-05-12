@@ -2,9 +2,15 @@
 
 use App\Http\Controllers\Api\V1\ApprovalController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\ContractController;
+use App\Http\Controllers\Api\V1\CustomerController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\InvoiceRequestActionController;
 use App\Http\Controllers\Api\V1\InvoiceRequestController;
+use App\Http\Controllers\Api\V1\InvoiceRequestLegalDocumentController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\SignatureController;
+use App\Http\Controllers\Api\V1\TimelineController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'time' => now()->toIso8601String()]));
@@ -15,6 +21,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
+
+    Route::get('/me/signature', [SignatureController::class, 'show']);
+    Route::match(['put', 'post'], '/me/signature', [SignatureController::class, 'update']);
+    Route::delete('/me/signature', [SignatureController::class, 'destroy']);
+
+    Route::get('/customers', [CustomerController::class, 'index']);
+    Route::post('/customers', [CustomerController::class, 'store']);
+    Route::get('/customers/{customer}', [CustomerController::class, 'show']);
+    Route::put('/customers/{customer}', [CustomerController::class, 'update']);
+
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    Route::get('/contracts', [ContractController::class, 'index']);
+    Route::get('/contracts/{contract}', [ContractController::class, 'show']);
+    Route::get('/contracts/{contract}/installments', [ContractController::class, 'installments']);
+    Route::post('/contracts/{contract}/installments/{installment}/create-invoice-request', [ContractController::class, 'createInvoiceRequest']);
 
     // Invoice requests CRUD
     Route::get('/invoice-requests', [InvoiceRequestController::class, 'index']);
@@ -30,9 +52,16 @@ Route::middleware('auth:sanctum')->group(function () {
     // Workflow actions
     Route::post('/invoice-requests/{invoiceRequest}/submit', [InvoiceRequestActionController::class, 'submit']);
     Route::post('/invoice-requests/{invoiceRequest}/approve', [InvoiceRequestActionController::class, 'approve'])
-        ->middleware('permission:invoice.approve.dept|invoice.approve.accountant|invoice.approve.director');
+        ->middleware('permission:invoice.approve.accountant|invoice.approve.director', 'require.signature');
     Route::post('/invoice-requests/{invoiceRequest}/reject', [InvoiceRequestActionController::class, 'reject'])
-        ->middleware('permission:invoice.approve.dept|invoice.approve.accountant|invoice.approve.director');
+        ->middleware('permission:invoice.approve.accountant|invoice.approve.director', 'require.signature');
+    Route::post('/invoice-requests/{invoiceRequest}/return', [InvoiceRequestActionController::class, 'return'])
+        ->middleware('permission:invoice.return', 'require.signature');
+    Route::post('/invoice-requests/{invoiceRequest}/resubmit', [InvoiceRequestActionController::class, 'resubmit']);
+    Route::get('/invoice-requests/{invoiceRequest}/timeline', TimelineController::class);
+    Route::get('/invoice-requests/{invoiceRequest}/legal-documents', [InvoiceRequestLegalDocumentController::class, 'index']);
+    Route::post('/invoice-requests/{invoiceRequest}/legal-documents', [InvoiceRequestLegalDocumentController::class, 'store']);
+    Route::delete('/invoice-requests/{invoiceRequest}/legal-documents/{document}', [InvoiceRequestLegalDocumentController::class, 'destroy']);
 
     // Approval queue
     Route::get('/approvals/pending', [ApprovalController::class, 'pending']);
