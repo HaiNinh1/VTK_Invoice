@@ -44,10 +44,11 @@ class ManagerReadOnlyTest extends TestCase
     private function seedDraft($creator): InvoiceRequest
     {
         $rc = RevenueCenter::where('code', 'KV3')->first();
+        $type = InvoiceType::first();
 
-        return InvoiceRequest::create([
+        $invoice = InvoiceRequest::create([
             'request_code' => app(InvoiceCodeGenerator::class)->generate(),
-            'invoice_type_id' => InvoiceType::first()->id,
+            'invoice_type_id' => $type->id,
             'customer_id' => Customer::first()->id,
             'service_type_id' => ServiceType::first()->id,
             'revenue_center_id' => $rc->id,
@@ -56,8 +57,25 @@ class ManagerReadOnlyTest extends TestCase
             'before_vat' => 1000000,
             'tax_rate' => 10,
             'after_vat' => 1100000,
-            'legal_complete' => true,
             'status' => 'draft',
         ]);
+
+        // Satisfy invoice-type legal requirements so submit() passes.
+        // `legal_complete` is now computed server-side from these uploads.
+        foreach ((array) $type->required_legal_documents as $code) {
+            $invoice->legalDocuments()->create([
+                'document_type' => $code,
+                'file_path' => "fake/{$code}.pdf",
+                'original_filename' => "{$code}.pdf",
+                'file_size' => 100,
+                'mime_type' => 'application/pdf',
+                'uploaded_by_id' => $creator->id,
+                'created_at' => now(),
+            ]);
+        }
+
+        app(\App\Services\LegalComplianceService::class)->refresh($invoice);
+
+        return $invoice;
     }
 }

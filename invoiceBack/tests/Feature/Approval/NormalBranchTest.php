@@ -48,7 +48,7 @@ class NormalBranchTest extends TestCase
     {
         $rc = RevenueCenter::where('code', 'KV3')->first();
 
-        return InvoiceRequest::create([
+        $invoice = InvoiceRequest::create([
             'request_code' => app(InvoiceCodeGenerator::class)->generate(),
             'invoice_type_id' => InvoiceType::first()->id,
             'customer_id' => Customer::first()->id,
@@ -59,8 +59,9 @@ class NormalBranchTest extends TestCase
             'before_vat' => 1000000,
             'tax_rate' => 10,
             'after_vat' => 1100000,
-            'legal_complete' => $legalComplete,
             'status' => 'draft',
         ]);
+
+        return $legalComplete ? $this->satisfyLegalRequirements($invoice) : $invoice;
     }
 }

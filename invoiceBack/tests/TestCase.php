@@ -3,9 +3,11 @@
 namespace Tests;
 
 use App\Models\Department;
+use App\Models\InvoiceRequest;
 use App\Models\RevenueCenter;
 use App\Models\User;
 use App\Models\UserSignature;
+use App\Services\LegalComplianceService;
 use Database\Seeders\CatalogSeeder;
 use Database\Seeders\DepartmentRevenueCenterSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -50,5 +52,32 @@ abstract class TestCase extends BaseTestCase
         ]);
 
         return $user;
+    }
+
+    /**
+     * Upload placeholder legal documents covering every code the invoice
+     * type requires, then refresh compliance. Used by tests that need
+     * `legal_complete=true` without going through the HTTP upload flow.
+     */
+    protected function satisfyLegalRequirements(InvoiceRequest $invoice): InvoiceRequest
+    {
+        $type = $invoice->invoiceType()->first();
+        $codes = (array) ($type?->required_legal_documents ?? []);
+
+        foreach ($codes as $code) {
+            $invoice->legalDocuments()->create([
+                'document_type' => $code,
+                'file_path' => "fake/{$code}.pdf",
+                'original_filename' => "{$code}.pdf",
+                'file_size' => 100,
+                'mime_type' => 'application/pdf',
+                'uploaded_by_id' => $invoice->creator_id,
+                'created_at' => now(),
+            ]);
+        }
+
+        app(LegalComplianceService::class)->refresh($invoice);
+
+        return $invoice->refresh();
     }
 }
