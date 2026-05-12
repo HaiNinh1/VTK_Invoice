@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\InvoiceRequestLegalDocumentResource;
 use App\Models\InvoiceRequest;
 use App\Models\InvoiceRequestLegalDocument;
+use App\Services\LegalComplianceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class InvoiceRequestLegalDocumentController extends Controller
 {
+    public function __construct(protected LegalComplianceService $compliance) {}
+
     public function index(InvoiceRequest $invoiceRequest)
     {
         $this->authorize('view', $invoiceRequest);
@@ -43,6 +46,10 @@ class InvoiceRequestLegalDocumentController extends Controller
             'created_at' => now(),
         ]);
 
+        // Recompute legal compliance for the parent invoice request so that
+        // `legal_status_cache` and `legal_complete` stay in sync with uploads.
+        $this->compliance->refresh($invoiceRequest);
+
         return new InvoiceRequestLegalDocumentResource($document);
     }
 
@@ -53,6 +60,9 @@ class InvoiceRequestLegalDocumentController extends Controller
 
         Storage::disk('local')->delete($document->file_path);
         $document->delete();
+
+        // Recompute compliance after deletion so missing docs flip status back.
+        $this->compliance->refresh($invoiceRequest);
 
         return response()->noContent();
     }
