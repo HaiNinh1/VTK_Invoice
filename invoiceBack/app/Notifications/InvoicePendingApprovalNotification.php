@@ -21,6 +21,7 @@ class InvoicePendingApprovalNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'category' => 'approval',
             'event' => $this->event,
             'invoice_request_id' => $this->invoiceRequest->id,
             'request_code' => $this->invoiceRequest->request_code,

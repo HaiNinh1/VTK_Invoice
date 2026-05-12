@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\NotificationResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
         $user = $request->user();
         $query = $user->notifications();
@@ -17,7 +18,7 @@ class NotificationController extends Controller
         }
         $perPage = (int) min(100, max(1, (int) $request->input('per_page', 20)));
 
-        return response()->json($query->paginate($perPage));
+        return NotificationResource::collection($query->paginate($perPage));
     }
 
     public function markRead(Request $request, string $id): JsonResponse
