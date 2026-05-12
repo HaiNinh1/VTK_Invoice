@@ -43,6 +43,11 @@ class InvoiceRequestResource extends JsonResource
             'after_vat' => (string) $this->after_vat,
             'legal_status' => $this->legal_status_cache,
             'legal_complete' => (bool) $this->legal_complete,
+            'commitment' => $this->whenLoaded('commitments', function () {
+                $commitment = $this->commitments->sortByDesc('created_at')->first();
+
+                return $commitment?->only(['id', 'code', 'status', 'deadline', 'director_decision']);
+            }),
             'current_handler_id' => $this->current_handler_id,
             'approved_by_id' => $this->approved_by_id,
             'return_reason' => $this->return_reason,

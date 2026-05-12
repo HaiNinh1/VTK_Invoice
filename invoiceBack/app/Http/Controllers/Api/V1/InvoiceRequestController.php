@@ -28,7 +28,7 @@ class InvoiceRequestController extends Controller
         $user = $request->user();
 
         $query = InvoiceRequest::query()
-            ->with(['customer', 'invoiceType', 'serviceType', 'revenueCenter', 'creator'])
+            ->with(['customer', 'invoiceType', 'serviceType', 'revenueCenter', 'creator', 'commitments'])
             ->visibleTo($user);
 
         $builder = QueryBuilder::for($query)
@@ -59,7 +59,7 @@ class InvoiceRequestController extends Controller
     public function show(InvoiceRequest $invoiceRequest): InvoiceRequestResource
     {
         $this->authorize('view', $invoiceRequest);
-        $invoiceRequest->load(['customer', 'invoiceType', 'serviceType', 'revenueCenter', 'creator', 'documents', 'approvals']);
+        $invoiceRequest->load(['customer', 'invoiceType', 'serviceType', 'revenueCenter', 'creator', 'documents', 'approvals', 'commitments']);
 
         return new InvoiceRequestResource($invoiceRequest);
     }
@@ -80,7 +80,7 @@ class InvoiceRequestController extends Controller
 
         $this->compliance->refresh($invoice);
 
-        $invoice->load(['customer', 'invoiceType', 'serviceType', 'revenueCenter', 'creator']);
+        $invoice->load(['customer', 'invoiceType', 'serviceType', 'revenueCenter', 'creator', 'commitments']);
 
         return new InvoiceRequestResource($invoice);
     }
@@ -98,7 +98,7 @@ class InvoiceRequestController extends Controller
         // when invoice_type_id changes (different required document set).
         $this->compliance->refresh($invoiceRequest);
 
-        $invoiceRequest->load(['customer', 'invoiceType', 'serviceType', 'revenueCenter', 'creator']);
+        $invoiceRequest->load(['customer', 'invoiceType', 'serviceType', 'revenueCenter', 'creator', 'commitments']);
 
         return new InvoiceRequestResource($invoiceRequest);
     }
