@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Exceptions\InstallmentAlreadyInvoicedException;
 use App\Models\Contract;
 use App\Models\InvoiceRequest;
 use App\Models\InvoiceType;
@@ -19,6 +20,15 @@ class CreateInvoiceFromInstallmentAction
     {
         if ($installment->contract_id !== $contract->id) {
             throw ValidationException::withMessages(['installment' => 'Installment does not belong to contract.']);
+        }
+
+        $existingInvoice = InvoiceRequest::query()
+            ->where('payment_installment_id', $installment->id)
+            ->whereNotIn('status', ['rejected', 'returned'])
+            ->first();
+
+        if ($existingInvoice) {
+            throw new InstallmentAlreadyInvoicedException($existingInvoice->id);
         }
 
         $taxRate = 10;

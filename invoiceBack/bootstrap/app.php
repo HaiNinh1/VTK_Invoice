@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\InstallmentAlreadyInvoicedException;
 use App\Http\Middleware\RequireSignature;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -49,6 +50,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
             if ($e instanceof AuthorizationException) {
                 return response()->json(['message' => $e->getMessage() ?: 'This action is unauthorized.'], 403);
+            }
+
+            if ($e instanceof InstallmentAlreadyInvoicedException) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'code' => 'installment_already_invoiced',
+                    'existing_invoice_request_id' => $e->existingInvoiceRequestId,
+                ], 409);
             }
 
             $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
