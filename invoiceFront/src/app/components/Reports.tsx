@@ -9,6 +9,14 @@ import {
 } from 'recharts';
 import CenterReport from './CenterReport';
 import { useMasterInvoiceData } from '../data/masterInvoiceData';
+import { useLegalComplianceReport, useApproveLegalReport } from '../../lib/api/queries';
+import { useAuth } from '../../lib/auth/AuthProvider';
+
+// Convert dd/mm/yyyy text input value to ISO YYYY-MM-DD for backend; undefined if invalid/empty.
+function ddmmyyyyToIso(s: string): string | undefined {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((s || '').trim());
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : undefined;
+}
 
 type UserRole = 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
 
@@ -21,6 +29,24 @@ export default function Reports({ userRole = 'accountant' }: ReportsProps) {
   const [activeTab, setActiveTab] = useState<'revenue' | 'legal' | 'center' | 'reconciliation'>('revenue');
   const [timePeriod, setTimePeriod] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedCenter, setSelectedCenter] = useState<string | null>(null);
+
+  // C8: live legal compliance report filters (date filters are sent to backend;
+  // center filter stays local because the UI has names, not numeric IDs).
+  const [legalDateFrom, setLegalDateFrom] = useState('01/01/2026');
+  const [legalDateTo, setLegalDateTo] = useState('13/03/2026');
+  const [legalCenterName, setLegalCenterName] = useState<string>('all');
+  const { hasRole } = useAuth();
+  const canApproveReport = hasRole(['admin', 'director']);
+  const legalReportQuery = useLegalComplianceReport(
+    activeTab === 'legal'
+      ? {
+          date_from: ddmmyyyyToIso(legalDateFrom),
+          date_to: ddmmyyyyToIso(legalDateTo),
+        }
+      : undefined
+  );
+  const legalReport = legalReportQuery.data;
+  const approveLegalReport = useApproveLegalReport();
 
   // Manager department filtering
   const MANAGER_DEPARTMENT = 'KV3';
@@ -81,7 +107,19 @@ export default function Reports({ userRole = 'accountant' }: ReportsProps) {
   ];
 
   // Legal compliance data — DERIVED FROM MASTER DATA
-  const legalStats = getLegalStats();
+  // legalStats: prefer backend totals when the legal report has loaded;
+  // backend tracks 'missing' as a single bucket so map it onto 'insufficient'
+  // and zero out 'supplementing' (a legacy frontend-only sub-bucket).
+  const derivedLegalStats = getLegalStats();
+  const legalStats = legalReport?.totals
+    ? {
+        total: legalReport.totals.total,
+        complete: legalReport.totals.complete,
+        supplementing: 0,
+        insufficient: legalReport.totals.missing,
+        overdue: legalReport.totals.overdue,
+      }
+    : derivedLegalStats;
   const centerNameMap: Record<string, string> = {
     'KV1': 'TT Hà Nội',
     'KV2': 'TT Đà Nẵng',
@@ -333,7 +371,8 @@ export default function Reports({ userRole = 'accountant' }: ReportsProps) {
                       type="text"
                       placeholder="Từ ngày"
                       className="h-9 pl-9 pr-3 border border-[#D1D5DB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033] focus:border-transparent w-36"
-                      defaultValue="01/01/2026"
+                      value={legalDateFrom}
+                      onChange={(e) => setLegalDateFrom(e.target.value)}
                     />
                     <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
                   </div>
@@ -343,7 +382,8 @@ export default function Reports({ userRole = 'accountant' }: ReportsProps) {
                       type="text"
                       placeholder="Đến ngày"
                       className="h-9 pl-9 pr-3 border border-[#D1D5DB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033] focus:border-transparent w-36"
-                      defaultValue="13/03/2026"
+                      value={legalDateTo}
+                      onChange={(e) => setLegalDateTo(e.target.value)}
                     />
                     <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
                   </div>

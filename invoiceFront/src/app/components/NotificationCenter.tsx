@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   CheckCircle, AlertTriangle, Bell, Filter,
   Check, Trash2, ChevronDown,
@@ -21,6 +22,7 @@ interface DisplayNotification {
   bucket: 'today' | 'yesterday' | 'week' | 'older';
   read: boolean;
   priority?: 'high';
+  invoiceRequestId?: number;
 }
 
 function classify(type: string): Category {
@@ -73,6 +75,10 @@ function mapToDisplay(n: AppNotification): DisplayNotification {
   const fallbackTitle = (data['title'] as string | undefined) ?? 'Thông báo';
   const fallbackMessage = (data['message'] as string | undefined) ?? '';
   const code = data['invoice_request_code'] as string | undefined;
+  const invoiceRequestId =
+    typeof data['invoice_request_id'] === 'number'
+      ? (data['invoice_request_id'] as number)
+      : undefined;
   return {
     id: String(n.id),
     type: classify(n.type),
@@ -82,6 +88,7 @@ function mapToDisplay(n: AppNotification): DisplayNotification {
     bucket: bucketOf(n.created_at),
     read: !!n.read_at,
     priority: isPriority(n) ? 'high' : undefined,
+    invoiceRequestId,
   };
 }
 
@@ -92,6 +99,7 @@ export default function NotificationCenter() {
   const { data, isLoading, isError, refetch } = useNotifications({ per_page: 100 });
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
+  const navigate = useNavigate();
 
   const rawList = data?.data ?? [];
   const allNotifications = useMemo(() => rawList.map(mapToDisplay), [rawList]);
@@ -113,8 +121,12 @@ export default function NotificationCenter() {
   const unreadCount = allNotifications.filter(n => !n.read).length;
 
   function handleItemClick(notif: DisplayNotification) {
-    if (notif.read) return;
-    markRead.mutate(notif.id);
+    if (!notif.read) {
+      markRead.mutate(notif.id);
+    }
+    if (notif.invoiceRequestId) {
+      navigate(`/invoices/${notif.invoiceRequestId}`);
+    }
   }
 
   function handleMarkAll() {

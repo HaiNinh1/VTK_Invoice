@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import { dashboardApi, DashboardData } from './endpoints/dashboard';
 import { notificationsApi } from './endpoints/notifications';
+import { authApi } from './endpoints/auth';
 import {
   invoiceRequestsApi,
   invoiceActionsApi,
@@ -272,11 +273,31 @@ export function useUpdateSignature() {
 }
 
 // ---------- unread badge helper ----------
+// Backend has no dedicated unread_count endpoint; we hit /notifications?unread=true&per_page=1
+// and read meta.total which Laravel pagination provides as the authoritative unread total.
 export function useUnreadNotificationCount() {
   const q = useNotifications({ unread: true, per_page: 1 });
-  // Backend returns paginated with meta.total
-  const total = (q.data?.meta as { total?: number } | undefined)?.total ?? q.data?.data.length ?? 0;
+  const total = (q.data?.meta as { total?: number } | undefined)?.total ?? 0;
   return { count: total, isLoading: q.isLoading, isError: q.isError };
+}
+
+// ---------- current user / change password ----------
+export function useMe() {
+  return useQuery({
+    queryKey: ['auth', 'me'] as const,
+    queryFn: authApi.me,
+    staleTime: 60_000,
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (payload: {
+      current_password: string;
+      new_password: string;
+      new_password_confirmation: string;
+    }) => authApi.changePassword(payload),
+  });
 }
 
 // Re-export AppNotification for convenience
