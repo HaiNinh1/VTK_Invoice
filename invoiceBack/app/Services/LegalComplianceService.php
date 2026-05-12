@@ -82,18 +82,14 @@ class LegalComplianceService
             ? $request->invoiceType
             : $request->invoiceType()->first();
 
-        if ($type !== null) {
-            $pivotCodes = $type->legalDocuments()
+        if ($type !== null && $type->legalDocuments()->exists()) {
+            return $type->legalDocuments()
                 ->wherePivot('required', true)
                 ->pluck('legal_documents.code')
                 ->map(fn ($code) => (string) $code)
                 ->unique()
                 ->values()
                 ->all();
-
-            if (count($pivotCodes) > 0) {
-                return $pivotCodes;
-            }
         }
 
         $codes = $type?->required_legal_documents;
