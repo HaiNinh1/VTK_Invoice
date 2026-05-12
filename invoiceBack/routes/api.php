@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CommitmentController;
 use App\Http\Controllers\Api\V1\ContractController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\InvoiceTypeController;
 use App\Http\Controllers\Api\V1\InvoiceRequestActionController;
 use App\Http\Controllers\Api\V1\InvoiceRequestController;
 use App\Http\Controllers\Api\V1\InvoiceRequestLegalDocumentController;
@@ -32,6 +33,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/customers', [CustomerController::class, 'store']);
     Route::get('/customers/{customer}', [CustomerController::class, 'show']);
     Route::put('/customers/{customer}', [CustomerController::class, 'update']);
+
+    Route::middleware('role_or_permission:admin|catalog.manage|invoice_type.manage')->group(function () {
+        Route::get('/invoice-types', [InvoiceTypeController::class, 'index']);
+        Route::post('/invoice-types', [InvoiceTypeController::class, 'store']);
+        Route::get('/invoice-types/{invoiceType}', [InvoiceTypeController::class, 'show']);
+        Route::put('/invoice-types/{invoiceType}', [InvoiceTypeController::class, 'update']);
+        Route::delete('/invoice-types/{invoiceType}', [InvoiceTypeController::class, 'destroy']);
+        Route::post('/invoice-types/{invoiceType}/toggle-status', [InvoiceTypeController::class, 'toggleStatus']);
+    });
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/reports/legal-compliance', [LegalComplianceReportController::class, 'show'])
