@@ -15,6 +15,8 @@ class ContractController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Contract::class);
+
         $query = Contract::query()->with('customer')->latest();
 
         if ($status = $request->input('status')) {
@@ -28,11 +30,15 @@ class ContractController extends Controller
 
     public function show(Contract $contract): ContractResource
     {
+        $this->authorize('view', $contract);
+
         return new ContractResource($contract->load(['customer', 'installments']));
     }
 
     public function installments(Contract $contract)
     {
+        $this->authorize('view', $contract);
+
         return PaymentInstallmentResource::collection($contract->installments()->orderBy('sequence')->get());
     }
 

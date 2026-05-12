@@ -13,6 +13,8 @@ class CustomerController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Customer::class);
+
         $query = Customer::query()->latest();
 
         if ($search = $request->input('search')) {
@@ -30,16 +32,21 @@ class CustomerController extends Controller
 
     public function store(StoreCustomerRequest $request): CustomerResource
     {
+        $this->authorize('create', Customer::class);
+
         return new CustomerResource(Customer::create($request->validated()));
     }
 
     public function show(Customer $customer): CustomerResource
     {
+        $this->authorize('view', $customer);
+
         return new CustomerResource($customer);
     }
 
     public function update(UpdateCustomerRequest $request, Customer $customer): CustomerResource
     {
+        $this->authorize('update', $customer);
         $customer->update($request->validated());
 
         return new CustomerResource($customer);

@@ -14,7 +14,7 @@ class CustomerExtendedFieldsTest extends TestCase
 
     public function test_customer_can_store_and_update_buyer_fields(): void
     {
-        $employee = $this->makeUser('employee', 'KV3');
+        $employee = $this->makeUser('admin');
 
         $response = $this->actingAs($employee, 'sanctum')
             ->postJson('/api/v1/customers', [
