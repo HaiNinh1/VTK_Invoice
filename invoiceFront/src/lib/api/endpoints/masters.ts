@@ -78,6 +78,21 @@ export interface PaymentInstallment {
   notes?: string | null;
 }
 
+export interface RevenueCenter {
+  id: number;
+  code: string;
+  name: string;
+  manager_user_id?: number | null;
+}
+
+export interface UserLite {
+  id: number;
+  name: string;
+  employee_code?: string | null;
+  department_id?: number | null;
+  revenue_center_id?: number | null;
+}
+
 function buildList<T>(raw: unknown): Paginated<T> {
   return raw as Paginated<T>;
 }
@@ -183,10 +198,10 @@ export const contractsApi = {
       const raw = await apiGet<unknown>(`/contracts/${contractId}/documents`);
       return unwrap<Array<Record<string, unknown>>>(raw);
     },
-    upload: async (contractId: number, file: File, documentType: string) => {
+    upload: async (contractId: number, file: File, kind?: string) => {
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('document_type', documentType);
+      if (kind) fd.append('kind', kind);
       return apiPost<unknown>(`/contracts/${contractId}/documents`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -201,5 +216,26 @@ export const contractsApi = {
         `/contracts/${contractId}/documents/${documentId}/download`,
         `contract-${contractId}-doc-${documentId}`
       ),
+  },
+};
+
+export const revenueCentersApi = {
+  list: async (params?: { search?: string; per_page?: number; page?: number }) => {
+    const raw = await apiGet<unknown>('/revenue-centers', { params });
+    return buildList<RevenueCenter>(raw);
+  },
+};
+
+export const usersApi = {
+  list: async (params?: {
+    search?: string;
+    per_page?: number;
+    page?: number;
+    role?: string;
+    revenue_center_id?: number;
+    department_id?: number;
+  }) => {
+    const raw = await apiGet<unknown>('/users', { params });
+    return buildList<UserLite>(raw);
   },
 };

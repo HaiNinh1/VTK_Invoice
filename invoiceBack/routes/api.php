@@ -13,9 +13,11 @@ use App\Http\Controllers\Api\V1\InvoiceRequestLegalDocumentController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\LegalDocumentController;
 use App\Http\Controllers\Api\V1\Reports\LegalComplianceReportController;
+use App\Http\Controllers\Api\V1\RevenueCenterController;
 use App\Http\Controllers\Api\V1\ServiceTypeController;
 use App\Http\Controllers\Api\V1\SignatureController;
 use App\Http\Controllers\Api\V1\TimelineController;
+use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'time' => now()->toIso8601String()]));
@@ -43,6 +45,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/legal-documents/{legalDocument}', [LegalDocumentController::class, 'show']);
     Route::get('/service-types', [ServiceTypeController::class, 'index']);
     Route::get('/service-types/{serviceType}', [ServiceTypeController::class, 'show']);
+
+    // Picker reads — any authenticated user
+    Route::get('/revenue-centers', [RevenueCenterController::class, 'index']);
+    Route::get('/users', [UserController::class, 'index']);
 
     // Catalog WRITE — admin / catalog-manager only
     Route::middleware('role_or_permission:admin|catalog.manage|invoice_type.manage')->group(function () {

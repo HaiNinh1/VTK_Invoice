@@ -1,6 +1,14 @@
 import { useRef, useState } from 'react';
-import { Download, FileText, Loader2, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, Download, FileText, Loader2, Trash2, Upload } from 'lucide-react';
 import { Button } from '../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '../ui/dialog';
 import {
   useContractDocuments,
   useUploadContractDocument,
@@ -58,7 +66,9 @@ export default function ContractDocumentsSection({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  // Radix confirmation dialog state (mirrors ContractManagement.tsx pattern).
+  const [deleteTarget, setDeleteTarget] = useState<DocRow | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const docs: DocRow[] = ((listQuery.data ?? []) as unknown) as DocRow[];
 
@@ -81,10 +91,10 @@ export default function ContractDocumentsSection({
     }
 
     try {
-      // Backend's StoreContractDocumentRequest validates `kind`; the frontend
-      // hook currently forwards `document_type` which backend ignores, so the
-      // server-side default `kind=contract` is applied. Don't expose this yet.
-      await uploadMut.mutateAsync({ file, documentType: 'contract' });
+      // Backend StoreContractDocumentRequest accepts an optional `kind`; we
+      // omit it so the backend default (`contract`) applies. A future C-polish
+      // pass can expose a UI selector for non-default kinds.
+      await uploadMut.mutateAsync({ file });
     } catch (e) {
       const msg =
         e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Tải lên thất bại';
@@ -101,23 +111,22 @@ export default function ContractDocumentsSection({
     } catch (e) {
       const msg =
         e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Tải xuống thất bại';
-      alert(msg);
+      setUploadError(msg);
     } finally {
       setDownloadingId(null);
     }
   }
 
-  async function handleDelete(doc: DocRow) {
-    if (!window.confirm(`Xoá tài liệu "${doc.original_filename ?? doc.id}"?`)) return;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteError(null);
     try {
-      setDeletingId(doc.id);
-      await deleteMut.mutateAsync(doc.id);
+      await deleteMut.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
     } catch (e) {
       const msg =
         e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Xoá thất bại';
-      alert(msg);
-    } finally {
-      setDeletingId(null);
+      setDeleteError(msg);
     }
   }
 
@@ -218,22 +227,75 @@ export default function ContractDocumentsSection({
                   variant="outline"
                   onClick={(e) => {
                     e.stopPropagation();
-                    void handleDelete(doc);
+                    setDeleteError(null);
+                    setDeleteTarget(doc);
                   }}
-                  disabled={deletingId === doc.id}
+                  disabled={deleteMut.isPending && deleteTarget?.id === doc.id}
                   className="h-8 px-2 text-xs text-[#991B1B] border-[#FECACA] hover:bg-[#FEF2F2]"
                 >
-                  {deletingId === doc.id ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
+                  <Trash2 size={14} />
                 </Button>
               )}
             </div>
           </div>
         ))}
       </div>
+
+      {/* Delete confirmation dialog (Radix) — backend 409 / errors surfaced verbatim. */}
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle size={18} className="text-[#EE0033]" />
+              Xác nhận xoá tài liệu
+            </DialogTitle>
+            <DialogDescription>
+              {deleteTarget && (
+                <>
+                  Bạn có chắc muốn xoá{' '}
+                  <strong>{deleteTarget.original_filename ?? `Tài liệu #${deleteTarget.id}`}</strong>
+                  ? Hành động này không thể hoàn tác.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteError && (
+            <div className="bg-[#FEF2F2] border border-[#FECACA] text-[#991B1B] text-sm rounded-md px-3 py-2">
+              {deleteError}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteError(null);
+              }}
+              disabled={deleteMut.isPending}
+            >
+              Huỷ
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              disabled={deleteMut.isPending}
+              className="bg-[#EE0033] text-white hover:bg-[#CC0029] disabled:opacity-50"
+            >
+              {deleteMut.isPending && <Loader2 size={16} className="mr-2 animate-spin" />}
+              Xoá
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

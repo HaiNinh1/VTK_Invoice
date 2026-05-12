@@ -22,12 +22,16 @@ import {
   serviceTypesApi,
   legalDocumentsCatalogApi,
   contractsApi,
+  revenueCentersApi,
+  usersApi,
   Customer,
   InvoiceType,
   ServiceType,
   LegalDocumentCatalog,
   Contract,
   PaymentInstallment,
+  RevenueCenter,
+  UserLite,
 } from './endpoints/masters';
 import { signatureApi } from './endpoints/signature';
 import {
@@ -63,6 +67,8 @@ export const qk = {
     ['legal-documents-catalog', params] as const,
   contracts: (params?: Record<string, unknown>) => ['contracts', params] as const,
   contract: (id: number) => ['contract', id] as const,
+  revenueCenters: (params?: Record<string, unknown>) => ['revenue-centers', params] as const,
+  users: (params?: Record<string, unknown>) => ['users', params] as const,
   signature: ['signature'] as const,
 };
 
@@ -249,6 +255,27 @@ export function useContract(id: number | null) {
     queryKey: id ? qk.contract(id) : ['contract', 'null'],
     queryFn: () => contractsApi.show(id!),
     enabled: !!id,
+  });
+}
+export function useRevenueCenters(params?: { search?: string; per_page?: number; page?: number }) {
+  return useQuery({
+    queryKey: qk.revenueCenters(params),
+    queryFn: () => revenueCentersApi.list(params),
+    staleTime: 5 * 60_000,
+  });
+}
+export function useUsers(params?: {
+  search?: string;
+  per_page?: number;
+  page?: number;
+  role?: string;
+  revenue_center_id?: number;
+  department_id?: number;
+}) {
+  return useQuery({
+    queryKey: qk.users(params),
+    queryFn: () => usersApi.list(params),
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -611,8 +638,8 @@ export function useContractDocuments(contractId: number | null) {
 export function useUploadContractDocument(contractId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ file, documentType }: { file: File; documentType?: string }) =>
-      contractsApi.documents.upload(contractId, file, documentType),
+    mutationFn: ({ file, kind }: { file: File; kind?: string }) =>
+      contractsApi.documents.upload(contractId, file, kind),
     onSuccess: () => qc.invalidateQueries({ queryKey: k.contractDocuments(contractId) }),
   });
 }

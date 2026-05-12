@@ -9,8 +9,8 @@ import {
   DialogFooter,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { useCreateContract, useUpdateContract, useCustomers } from '../../../lib/api/queries';
-import type { Contract, Customer } from '../../../lib/api/endpoints/masters';
+import { useCreateContract, useUpdateContract, useCustomers, useRevenueCenters, useUsers } from '../../../lib/api/queries';
+import type { Contract, Customer, RevenueCenter, UserLite } from '../../../lib/api/endpoints/masters';
 import { ApiError } from '../../../lib/api/errors';
 
 type ContractStatus = 'draft' | 'active' | 'completed' | 'terminated';
@@ -101,6 +101,34 @@ export default function ContractFormModal({
     open ? { search: customerSearch || undefined, per_page: 20 } : undefined
   );
   const customerOptions: Customer[] = customersQuery.data?.data ?? [];
+
+  // Picker data — revenue centers and users (project managers).
+  const revenueCentersQuery = useRevenueCenters(open ? { per_page: 200 } : undefined);
+  const usersQuery = useUsers(open ? { per_page: 200 } : undefined);
+  const revenueCenters: RevenueCenter[] = revenueCentersQuery.data?.data ?? [];
+  const users: UserLite[] = usersQuery.data?.data ?? [];
+
+  // Keep currently-selected RC/user visible even if outside loaded page.
+  const ensureSelected = <T extends { id: number }>(
+    list: T[],
+    selected: T | null | undefined,
+    selectedId: string
+  ): T[] => {
+    if (!selected) return list;
+    if (list.some((x) => x.id === selected.id)) return list;
+    if (String(selected.id) !== selectedId) return list;
+    return [selected, ...list];
+  };
+  const mergedRevenueCenters = ensureSelected<RevenueCenter>(
+    revenueCenters,
+    contract?.revenue_center as RevenueCenter | undefined,
+    form.revenue_center_id
+  );
+  const mergedUsers = ensureSelected<UserLite>(
+    users,
+    contract?.project_manager as UserLite | undefined,
+    form.project_manager_id
+  );
 
   // Make sure currently-selected customer stays visible even if outside search.
   const selectedCustomer = contract?.customer;
@@ -327,32 +355,45 @@ export default function ContractFormModal({
 
           <div className="md:col-span-1">
             <label className="block text-xs font-medium text-[#374151] mb-1">
-              ID Người phụ trách (tùy chọn)
+              Người phụ trách
             </label>
-            <input
-              type="number"
-              min="1"
-              step="1"
+            <select
               value={form.project_manager_id}
               onChange={(e) => setForm({ ...form, project_manager_id: e.target.value })}
               className="w-full h-9 px-3 border border-[#D1D5DB] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033]"
-              placeholder="ID người dùng phụ trách hợp đồng"
-            />
+            >
+              <option value="">— Chọn người phụ trách —</option>
+              {mergedUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                  {u.employee_code ? ` (${u.employee_code})` : ''}
+                </option>
+              ))}
+            </select>
+            {usersQuery.isLoading && (
+              <p className="text-xs text-[#6B7280] mt-1">Đang tải danh sách...</p>
+            )}
           </div>
 
           <div className="md:col-span-1">
             <label className="block text-xs font-medium text-[#374151] mb-1">
-              ID Trung tâm doanh thu (tùy chọn)
+              Trung tâm doanh thu
             </label>
-            <input
-              type="number"
-              min="1"
-              step="1"
+            <select
               value={form.revenue_center_id}
               onChange={(e) => setForm({ ...form, revenue_center_id: e.target.value })}
               className="w-full h-9 px-3 border border-[#D1D5DB] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033]"
-              placeholder="ID trung tâm doanh thu"
-            />
+            >
+              <option value="">— Chọn trung tâm —</option>
+              {mergedRevenueCenters.map((rc) => (
+                <option key={rc.id} value={rc.id}>
+                  {rc.code} — {rc.name}
+                </option>
+              ))}
+            </select>
+            {revenueCentersQuery.isLoading && (
+              <p className="text-xs text-[#6B7280] mt-1">Đang tải danh sách...</p>
+            )}
           </div>
 
           <div className="md:col-span-2">
