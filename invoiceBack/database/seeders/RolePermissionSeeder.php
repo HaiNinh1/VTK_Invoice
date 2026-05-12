@@ -27,11 +27,16 @@ class RolePermissionSeeder extends Seeder
         'user.manage',
         'report.view.center',
         'report.view.company',
+        'commitment.create',
+        'commitment.extend',
+        'commitment.approve',
+        'commitment.remind',
     ];
 
     public const ROLE_MATRIX = [
         'employee' => [
             'invoice.view.own', 'invoice.create', 'invoice.update',
+            'commitment.create',
         ],
         'manager' => [
             'invoice.view.own', 'invoice.view.center',
@@ -42,11 +47,13 @@ class RolePermissionSeeder extends Seeder
             'invoice.approve.accountant', 'invoice.return',
             'invoice.issue', 'invoice.account',
             'report.view.company',
+            'commitment.remind',
         ],
         'director' => [
             'invoice.view.own', 'invoice.view.all',
             'invoice.approve.director', 'invoice.return',
             'report.view.company',
+            'commitment.extend', 'commitment.approve', 'commitment.remind',
         ],
         'admin' => self::PERMISSIONS,
     ];
