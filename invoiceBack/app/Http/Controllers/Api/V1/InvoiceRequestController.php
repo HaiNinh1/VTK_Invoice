@@ -89,9 +89,15 @@ class InvoiceRequestController extends Controller
     {
         $this->authorize('update', $invoiceRequest);
         $data = $request->validated();
+        $originalTypeId = $invoiceRequest->invoice_type_id;
         $invoiceRequest->fill($data);
         $invoiceRequest->updated_by = $request->user()->id;
         $invoiceRequest->save();
+
+        // Refresh compliance after every update; cheap and guarantees correctness
+        // when invoice_type_id changes (different required document set).
+        $this->compliance->refresh($invoiceRequest);
+
         $invoiceRequest->load(['customer', 'invoiceType', 'serviceType', 'revenueCenter', 'creator']);
 
         return new InvoiceRequestResource($invoiceRequest);

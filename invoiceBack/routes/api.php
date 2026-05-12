@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'time' => now()->toIso8601String()]));
 
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:6,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);

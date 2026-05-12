@@ -21,7 +21,7 @@ class InvoiceRequest extends Model
         'request_code', 'invoice_no', 'invoice_type_id', 'customer_id', 'service_type_id',
         'contract_id', 'payment_installment_id', 'revenue_center_id', 'creator_id', 'department_id',
         'current_handler_id', 'approved_by_id', 'contract_number', 'contract_date',
-        'before_vat', 'tax_rate', 'after_vat', 'service_content', 'status', 'legal_status_cache', 'legal_complete',
+        'before_vat', 'tax_rate', 'after_vat', 'service_content', 'status', 'legal_status_cache',
         's_invoice_status', 's_invoice_code', 's_invoice_error', 'vfs_status',
         'notes', 'return_reason', 'rejection_reason', 'created_by', 'updated_by',
     ];
