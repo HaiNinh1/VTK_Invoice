@@ -22,6 +22,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  phone?: string | null;
   employee_code?: string | null;
   is_active?: boolean;
   department?: { id: number; code: string; name: string } | null;
@@ -84,11 +85,16 @@ export interface DashboardStats {
 export interface AppNotification {
   id: string;
   type: string;
+  title?: string;
+  message?: string;
+  category?: string;
+  priority?: string;
   data: Record<string, unknown> & {
     title?: string;
     message?: string;
     invoice_request_id?: number;
     invoice_request_code?: string;
+    request_code?: string;
   };
   read_at: string | null;
   created_at: string;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FileText, Plus, Search, Edit, Trash2, Power, PowerOff, CheckCircle,
   XCircle, AlertCircle, Settings, Loader2,
@@ -18,6 +18,7 @@ import {
   useUpdateLegalDocCatalog,
   useDeleteLegalDocCatalog,
 } from '../../lib/api/queries';
+import { ApiError } from '../../lib/api/errors';
 import type { InvoiceType, LegalDocumentCatalog } from '../../lib/api/endpoints/masters';
 
 interface InvoiceTypeManagementProps {
@@ -26,6 +27,21 @@ interface InvoiceTypeManagementProps {
 }
 
 type TabKey = 'types' | 'documents';
+type InvoiceTypeStatus = 'active' | 'inactive';
+
+function errMsg(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) return e.message;
+  if (e instanceof Error) return e.message;
+  return fallback;
+}
+
+function InlineError({ message }: { message: string }) {
+  return (
+    <div className="bg-[#FEF2F2] border border-[#FECACA] text-[#991B1B] text-sm rounded-md px-3 py-2">
+      {message}
+    </div>
+  );
+}
 
 export default function InvoiceTypeManagement(_props: InvoiceTypeManagementProps) {
   const [tab, setTab] = useState<TabKey>('types');
@@ -76,11 +92,13 @@ function TabButton({
 
 function InvoiceTypesPanel() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | InvoiceTypeStatus>('all');
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editing, setEditing] = useState<InvoiceType | null>(null);
   const [target, setTarget] = useState<InvoiceType | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const params = {
     search: searchTerm || undefined,
@@ -100,26 +118,42 @@ function InvoiceTypesPanel() {
 
   const openCreate = () => { setEditing(null); setShowFormModal(true); };
   const openEdit = (t: InvoiceType) => { setEditing(t); setShowFormModal(true); };
-  const openDelete = (t: InvoiceType) => { setTarget(t); setShowDeleteModal(true); };
+  const openDelete = (t: InvoiceType) => {
+    setTarget(t);
+    setDeleteError(null);
+    setShowDeleteModal(true);
+  };
 
   const onToggle = async (t: InvoiceType) => {
+    setPageError(null);
     try { await toggleMut.mutateAsync(t.id); }
-    catch (e: any) { alert(e?.message ?? 'Không thể chuyển trạng thái'); }
+    catch (e) { setPageError(errMsg(e, 'Không thể chuyển trạng thái')); }
   };
 
   const onDelete = async () => {
     if (!target) return;
+    setDeleteError(null);
     try {
       await deleteMut.mutateAsync(target.id);
       setShowDeleteModal(false);
       setTarget(null);
-    } catch (e: any) {
-      alert(e?.message ?? 'Không thể xóa');
+    } catch (e) {
+      setDeleteError(errMsg(e, 'Không thể xóa'));
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* Page-level error banner (toggle / load actions) */}
+      {pageError && (
+        <div className="flex items-start justify-between gap-3 bg-[#FEF2F2] border border-[#FECACA] text-[#991B1B] text-sm rounded-md px-3 py-2">
+          <span>{pageError}</span>
+          <button onClick={() => setPageError(null)} className="text-[#991B1B] hover:text-[#7F1D1D]">
+            <XCircle size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Header bar */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-[#6B7280]">
@@ -165,7 +199,7 @@ function InvoiceTypesPanel() {
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | InvoiceTypeStatus)}
             className="h-10 px-3 border border-[#E5E7EB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033]"
           >
             <option value="all">Tất cả trạng thái</option>
@@ -263,29 +297,31 @@ function InvoiceTypesPanel() {
         initial={editing}
         submitting={createMut.isPending || updateMut.isPending}
         onSubmit={async (payload) => {
-          try {
-            if (editing) {
-              await updateMut.mutateAsync({ id: editing.id, payload });
-            } else {
-              await createMut.mutateAsync(payload);
-            }
-            setShowFormModal(false);
-            setEditing(null);
-          } catch (e: any) {
-            alert(e?.message ?? 'Không thể lưu');
+          if (editing) {
+            await updateMut.mutateAsync({ id: editing.id, payload });
+          } else {
+            await createMut.mutateAsync(payload);
           }
+          setShowFormModal(false);
+          setEditing(null);
         }}
       />
 
       {/* Delete Modal */}
-      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+      <Dialog
+        open={showDeleteModal}
+        onOpenChange={(v) => {
+          setShowDeleteModal(v);
+          if (!v) setDeleteError(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Xác nhận xóa</DialogTitle>
             <DialogDescription>Bạn có chắc chắn muốn xóa loại hóa đơn này?</DialogDescription>
           </DialogHeader>
           {target && (
-            <div className="py-4">
+            <div className="py-4 space-y-3">
               <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <AlertCircle size={20} className="text-[#D97706] flex-shrink-0 mt-0.5" />
@@ -295,10 +331,17 @@ function InvoiceTypesPanel() {
                   </div>
                 </div>
               </div>
+              {deleteError && <InlineError message={deleteError} />}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Hủy</Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteModal(false)}
+              disabled={deleteMut.isPending}
+            >
+              Hủy
+            </Button>
             <Button
               onClick={onDelete}
               disabled={deleteMut.isPending}
@@ -320,35 +363,42 @@ function InvoiceTypeFormDialog({
   onOpenChange: (v: boolean) => void;
   initial: InvoiceType | null;
   submitting: boolean;
-  onSubmit: (payload: Partial<InvoiceType>) => void;
+  onSubmit: (payload: Partial<InvoiceType>) => Promise<void>;
 }) {
   const [form, setForm] = useState({
-    code: '', name: '', description: '', status: 'active' as 'active' | 'inactive',
+    code: '', name: '', description: '', status: 'active' as InvoiceTypeStatus,
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Sync when opening or switching target
-  useMemo(() => {
+  useEffect(() => {
     if (open) {
       setForm({
         code: initial?.code ?? '',
         name: initial?.name ?? '',
         description: initial?.description ?? '',
-        status: (initial?.status as any) ?? 'active',
+        status: (initial?.status === 'inactive' ? 'inactive' : 'active') as InvoiceTypeStatus,
       });
+      setFormError(null);
     }
   }, [open, initial]);
 
-  const submit = () => {
+  const submit = async () => {
+    setFormError(null);
     if (!form.code || !form.name) {
-      alert('Vui lòng nhập đầy đủ Mã loại và Tên loại');
+      setFormError('Vui lòng nhập đầy đủ Mã loại và Tên loại');
       return;
     }
-    onSubmit({
-      code: form.code,
-      name: form.name,
-      description: form.description || null,
-      status: form.status,
-    });
+    try {
+      await onSubmit({
+        code: form.code,
+        name: form.name,
+        description: form.description || null,
+        status: form.status,
+      });
+    } catch (e) {
+      setFormError(errMsg(e, 'Không thể lưu'));
+    }
   };
 
   return (
@@ -423,10 +473,18 @@ function InvoiceTypeFormDialog({
               </label>
             </div>
           </div>
+
+          {formError && <InlineError message={formError} />}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Hủy</Button>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            Hủy
+          </Button>
           <Button
             onClick={submit}
             disabled={submitting}
@@ -448,6 +506,7 @@ function LegalDocsCatalogPanel() {
   const [showDel, setShowDel] = useState(false);
   const [editing, setEditing] = useState<LegalDocumentCatalog | null>(null);
   const [target, setTarget] = useState<LegalDocumentCatalog | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useLegalDocumentsCatalog();
   const docs = (data?.data ?? []).filter((d) => {
@@ -459,6 +518,24 @@ function LegalDocsCatalogPanel() {
   const createMut = useCreateLegalDocCatalog();
   const updateMut = useUpdateLegalDocCatalog();
   const deleteMut = useDeleteLegalDocCatalog();
+
+  const openDelete = (d: LegalDocumentCatalog) => {
+    setTarget(d);
+    setDeleteError(null);
+    setShowDel(true);
+  };
+
+  const onDelete = async () => {
+    if (!target) return;
+    setDeleteError(null);
+    try {
+      await deleteMut.mutateAsync(target.id);
+      setShowDel(false);
+      setTarget(null);
+    } catch (e) {
+      setDeleteError(errMsg(e, 'Không thể xóa'));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -543,7 +620,7 @@ function LegalDocsCatalogPanel() {
                         <Edit size={16} className="text-[#6B7280]" />
                       </button>
                       <button
-                        onClick={() => { setTarget(d); setShowDel(true); }}
+                        onClick={() => openDelete(d)}
                         className="p-1.5 hover:bg-[#FEE2E2] rounded"
                         title="Xóa"
                       >
@@ -570,48 +647,48 @@ function LegalDocsCatalogPanel() {
         initial={editing}
         submitting={createMut.isPending || updateMut.isPending}
         onSubmit={async (payload) => {
-          try {
-            if (editing) {
-              await updateMut.mutateAsync({ id: editing.id, payload });
-            } else {
-              await createMut.mutateAsync(payload);
-            }
-            setShowForm(false);
-            setEditing(null);
-          } catch (e: any) {
-            alert(e?.message ?? 'Không thể lưu');
+          if (editing) {
+            await updateMut.mutateAsync({ id: editing.id, payload });
+          } else {
+            await createMut.mutateAsync(payload);
           }
+          setShowForm(false);
+          setEditing(null);
         }}
       />
 
-      <Dialog open={showDel} onOpenChange={setShowDel}>
+      <Dialog
+        open={showDel}
+        onOpenChange={(v) => {
+          setShowDel(v);
+          if (!v) setDeleteError(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Xác nhận xóa</DialogTitle>
             <DialogDescription>Bạn có chắc chắn muốn xóa tài liệu này?</DialogDescription>
           </DialogHeader>
           {target && (
-            <div className="py-4">
+            <div className="py-4 space-y-3">
               <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg p-4 text-sm text-[#92400E]">
                 <div className="font-medium mb-1">{target.name}</div>
                 <div>Mã: {target.code}</div>
               </div>
+              {deleteError && <InlineError message={deleteError} />}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDel(false)}>Hủy</Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowDel(false)}
+              disabled={deleteMut.isPending}
+            >
+              Hủy
+            </Button>
             <Button
               disabled={deleteMut.isPending}
-              onClick={async () => {
-                if (!target) return;
-                try {
-                  await deleteMut.mutateAsync(target.id);
-                  setShowDel(false);
-                  setTarget(null);
-                } catch (e: any) {
-                  alert(e?.message ?? 'Không thể xóa');
-                }
-              }}
+              onClick={onDelete}
               className="bg-[#DC2626] text-white hover:bg-[#B91C1C]"
             >
               {deleteMut.isPending ? 'Đang xóa…' : 'Xóa'}
@@ -630,13 +707,14 @@ function LegalDocFormDialog({
   onOpenChange: (v: boolean) => void;
   initial: LegalDocumentCatalog | null;
   submitting: boolean;
-  onSubmit: (payload: Partial<LegalDocumentCatalog>) => void;
+  onSubmit: (payload: Partial<LegalDocumentCatalog>) => Promise<void>;
 }) {
   const [form, setForm] = useState({
     code: '', name: '', group: '', default_required: false, enabled: true,
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
-  useMemo(() => {
+  useEffect(() => {
     if (open) {
       setForm({
         code: initial?.code ?? '',
@@ -645,21 +723,27 @@ function LegalDocFormDialog({
         default_required: !!initial?.default_required,
         enabled: initial?.enabled !== false,
       });
+      setFormError(null);
     }
   }, [open, initial]);
 
-  const submit = () => {
+  const submit = async () => {
+    setFormError(null);
     if (!form.code || !form.name) {
-      alert('Vui lòng nhập Mã và Tên tài liệu');
+      setFormError('Vui lòng nhập Mã và Tên tài liệu');
       return;
     }
-    onSubmit({
-      code: form.code,
-      name: form.name,
-      group: form.group || null,
-      default_required: form.default_required,
-      enabled: form.enabled,
-    });
+    try {
+      await onSubmit({
+        code: form.code,
+        name: form.name,
+        group: form.group || null,
+        default_required: form.default_required,
+        enabled: form.enabled,
+      });
+    } catch (e) {
+      setFormError(errMsg(e, 'Không thể lưu'));
+    }
   };
 
   return (
@@ -729,10 +813,18 @@ function LegalDocFormDialog({
               <span className="text-sm text-[#374151]">Đang bật</span>
             </label>
           </div>
+
+          {formError && <InlineError message={formError} />}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Hủy</Button>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            Hủy
+          </Button>
           <Button
             onClick={submit}
             disabled={submitting}

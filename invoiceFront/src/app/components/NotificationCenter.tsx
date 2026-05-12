@@ -25,8 +25,13 @@ interface DisplayNotification {
   invoiceRequestId?: number;
 }
 
-function classify(type: string): Category {
-  const t = type.toLowerCase();
+function classify(n: AppNotification): Category {
+  // Backend may emit `category` directly on the resource.
+  const explicit = (n.category ?? '').toLowerCase();
+  if (explicit === 'approval' || explicit === 'legal' || explicit === 'system') {
+    return explicit as Category;
+  }
+  const t = n.type.toLowerCase();
   if (t.includes('approv') || t.includes('reject') || t.includes('return') || t.includes('submit') || t.includes('resubmit')) {
     return 'approval';
   }
@@ -66,24 +71,31 @@ function relativeTime(iso: string): string {
 }
 
 function isPriority(n: AppNotification): boolean {
+  if (n.priority && n.priority.toLowerCase() === 'high') return true;
   const t = n.type.toLowerCase();
   return t.includes('overdue') || t.includes('reject') || t.includes('return') || t.includes('error');
 }
 
 function mapToDisplay(n: AppNotification): DisplayNotification {
   const data = n.data ?? {};
-  const fallbackTitle = (data['title'] as string | undefined) ?? 'Thông báo';
-  const fallbackMessage = (data['message'] as string | undefined) ?? '';
-  const code = data['invoice_request_code'] as string | undefined;
+  // Backend now exposes title/message at the top level; the older `data.*`
+  // payload remains for backward compatibility.
+  const title = n.title ?? (data['title'] as string | undefined) ?? 'Thông báo';
+  const message = n.message ?? (data['message'] as string | undefined) ?? '';
+  // Backend approval notifications emit `request_code`; older payloads used
+  // `invoice_request_code`. Accept either.
+  const code =
+    (data['request_code'] as string | undefined) ??
+    (data['invoice_request_code'] as string | undefined);
   const invoiceRequestId =
     typeof data['invoice_request_id'] === 'number'
       ? (data['invoice_request_id'] as number)
       : undefined;
   return {
     id: String(n.id),
-    type: classify(n.type),
-    title: code ? `${fallbackTitle} (${code})` : fallbackTitle,
-    message: fallbackMessage,
+    type: classify(n),
+    title: code ? `${title} (${code})` : title,
+    message,
     time: relativeTime(n.created_at),
     bucket: bucketOf(n.created_at),
     read: !!n.read_at,

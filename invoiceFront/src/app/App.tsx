@@ -11,7 +11,6 @@ import DashboardCompany from './components/DashboardCompany';
 import DashboardEmployee from './components/DashboardEmployee';
 import DashboardManager from './components/DashboardManager';
 import AccountingVFS from './components/AccountingVFS';
-import CreateInvoiceRoleBased from './components/CreateInvoiceRoleBased';
 import CreateInvoiceForm from './components/CreateInvoiceForm';
 import Approval from './components/Approval';
 import LegalTracking from './components/LegalTracking';
@@ -30,9 +29,11 @@ import ScreenMap from './components/ScreenMap';
 import InvoiceExport from './components/InvoiceExport';
 import InvoiceTypeManagement from './components/InvoiceTypeManagement';
 import ContractManagement from './components/ContractManagement';
+import InvoiceDetail from './components/InvoiceDetail';
 import { useAuth } from '../lib/auth/AuthProvider';
 import { useNotifications, useUnreadNotificationCount } from '../lib/api/queries';
 import { useActiveNav } from './useActiveNav';
+import { useLocation } from 'react-router';
 import { useTheme } from 'next-themes';
 
 // Demo role switcher is hidden in real auth flows; enable via VITE_ENABLE_DEMO_ROLE_SWITCHER=true
@@ -81,6 +82,9 @@ export default function App() {
   const { resolvedTheme, setTheme } = useTheme();
   const darkMode = resolvedTheme === 'dark';
   const [activeNav, setActiveNav] = useActiveNav();
+  const location = useLocation();
+  const invoiceDetailMatch = location.pathname.match(/^\/invoices\/([^/]+)$/);
+  const invoiceDetailId = invoiceDetailMatch ? invoiceDetailMatch[1] : null;
   const [filterExpanded, setFilterExpanded] = useState(true);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
@@ -91,9 +95,6 @@ export default function App() {
   const [currentRecordId, setCurrentRecordId] = useState<string | null>(null);
   const [showWireframeNav, setShowWireframeNav] = useState(true); // Show wireframe navigation by default
 
-  // Form state testing
-  const [formStatus, setFormStatus] = useState<'draft' | 'pending' | 'approved' | 'rejected' | 'returned' | 'issued'>('draft');
-  const [formIsOwner, setFormIsOwner] = useState(true);
 
   // Auth wiring — user/role come from backend (no more hardcoded values)
   const auth = useAuth();
@@ -836,38 +837,17 @@ export default function App() {
                 {/* INVOICE LIST VIEW */}
                 {activeNav === 'invoices' && (
                   <>
-                    {showCreateInvoice ? (
-                      <div className="space-y-4">
-                        {/* Test controls */}
-                        <div className="bg-white border border-[#E5E7EB] rounded-lg p-4 flex items-center gap-4 flex-wrap">
-                          <div className="text-sm font-medium text-[#6B7280]">Test States:</div>
-                          <div className="flex gap-2">
-                            <button onClick={() => setFormStatus('draft')} className={`px-3 py-1 text-xs rounded ${formStatus === 'draft' ? 'bg-[#EE0033] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}>Draft</button>
-                            <button onClick={() => setFormStatus('pending')} className={`px-3 py-1 text-xs rounded ${formStatus === 'pending' ? 'bg-[#EE0033] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}>Pending</button>
-                            <button onClick={() => setFormStatus('approved')} className={`px-3 py-1 text-xs rounded ${formStatus === 'approved' ? 'bg-[#EE0033] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}>Approved</button>
-                            <button onClick={() => setFormStatus('rejected')} className={`px-3 py-1 text-xs rounded ${formStatus === 'rejected' ? 'bg-[#EE0033] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}>Rejected</button>
-                            <button onClick={() => setFormStatus('returned')} className={`px-3 py-1 text-xs rounded ${formStatus === 'returned' ? 'bg-[#EE0033] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}>Returned</button>
-                            <button onClick={() => setFormStatus('issued')} className={`px-3 py-1 text-xs rounded ${formStatus === 'issued' ? 'bg-[#EE0033] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}>Issued</button>
-                          </div>
-                          <div className="h-6 w-px bg-[#E5E7EB]"></div>
-                          <div className="flex gap-2">
-                            <button onClick={() => setFormIsOwner(true)} className={`px-3 py-1 text-xs rounded ${formIsOwner ? 'bg-[#16A34A] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}>Is Owner</button>
-                            <button onClick={() => setFormIsOwner(false)} className={`px-3 py-1 text-xs rounded ${!formIsOwner ? 'bg-[#DC2626] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}>Not Owner</button>
-                          </div>
-                        </div>
-
-                        <CreateInvoiceRoleBased
-                          onBack={() => setShowCreateInvoice(false)}
-                          requestId="DN-2026-00156"
-                          status={formStatus}
-                          isOwner={formIsOwner}
-                          userRole={userRole}
-                          onNavigateToView={(view) => {
-                            setShowCreateInvoice(false);
-                            setActiveNav(view);
-                          }}
-                        />
-                      </div>
+                    {invoiceDetailId ? (
+                      <InvoiceDetail
+                        invoiceId={invoiceDetailId}
+                        userRole={userRole}
+                        onBack={() => setActiveNav('invoices')}
+                      />
+                    ) : showCreateInvoice ? (
+                      <CreateInvoiceForm
+                        onBack={() => setShowCreateInvoice(false)}
+                        onCreated={() => setShowCreateInvoice(false)}
+                      />
                     ) : (
                       <InvoiceListRoleBased
                         getStatusBadge={getInvoiceStatusBadge}
@@ -1097,7 +1077,13 @@ export default function App() {
 
             {activeNav === 'invoices' && (
               <>
-                {showCreateInvoice ? (
+                {invoiceDetailId ? (
+                  <InvoiceDetail
+                    invoiceId={invoiceDetailId}
+                    userRole={userRole}
+                    onBack={() => setActiveNav('invoices')}
+                  />
+                ) : showCreateInvoice ? (
                   <CreateInvoiceForm
                     onBack={() => setShowCreateInvoice(false)}
                     onCreated={() => setShowCreateInvoice(false)}

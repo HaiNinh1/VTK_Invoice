@@ -37,7 +37,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const changePasswordSchema = z
   .object({
-    current_password: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
+    old_password: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
     new_password: z.string().min(8, 'Mật khẩu mới tối thiểu 8 ký tự'),
     new_password_confirmation: z.string().min(1, 'Vui lòng nhập lại mật khẩu mới'),
   })

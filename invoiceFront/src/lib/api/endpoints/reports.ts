@@ -6,27 +6,34 @@
 
 import { apiGet, apiPost, unwrap } from '../client';
 
-export interface LegalComplianceReportRow {
-  invoice_request_id: number;
-  invoice_request_code: string;
-  customer?: { id: number; name: string } | null;
-  legal_complete: boolean;
-  missing_documents?: string[];
-  overdue_commitments?: number;
-  [key: string]: unknown;
+export interface LegalComplianceReportCenterRow {
+  revenue_center_id: number | null;
+  name: string | null;
+  total: number;
+  complete: number;
+}
+
+export interface LegalComplianceReportServiceRow {
+  service_type_id: number | null;
+  name: string | null;
+  total: number;
+  complete: number;
 }
 
 export interface LegalComplianceReport {
   generated_at?: string;
   approved_at?: string | null;
   approved_by?: { id: number; name: string } | null;
-  totals?: {
+  totals: {
     total: number;
     complete: number;
-    missing: number;
+    supplementing: number;
+    insufficient: number;
     overdue: number;
+    completion_rate: number;
   };
-  rows: LegalComplianceReportRow[];
+  by_center: LegalComplianceReportCenterRow[];
+  by_service: LegalComplianceReportServiceRow[];
   [key: string]: unknown;
 }
 
@@ -37,9 +44,8 @@ export interface ApproveLegalReportPayload {
 export const reportsApi = {
   legalCompliance: {
     get: async (params?: {
-      date_from?: string;
-      date_to?: string;
-      revenue_center_id?: number;
+      from?: string;
+      to?: string;
     }): Promise<LegalComplianceReport> => {
       const raw = await apiGet<unknown>('/reports/legal-compliance', { params });
       return unwrap<LegalComplianceReport>(raw);

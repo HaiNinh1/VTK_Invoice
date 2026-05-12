@@ -33,7 +33,7 @@ export default function UserProfile() {
   });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pwForm, setPwForm] = useState({
-    current_password: '',
+    old_password: '',
     new_password: '',
     new_password_confirmation: '',
   });
@@ -66,7 +66,7 @@ export default function UserProfile() {
     try {
       await changePassword.mutateAsync(pwForm);
       setPwSuccess(true);
-      setPwForm({ current_password: '', new_password: '', new_password_confirmation: '' });
+      setPwForm({ old_password: '', new_password: '', new_password_confirmation: '' });
     } catch (err) {
       setPwError(err instanceof Error ? err.message : 'Đổi mật khẩu thất bại.');
     }
@@ -270,8 +270,8 @@ export default function UserProfile() {
                 <input
                   type="password"
                   required
-                  value={pwForm.current_password}
-                  onChange={(e) => setPwForm((p) => ({ ...p, current_password: e.target.value }))}
+                  value={pwForm.old_password}
+                  onChange={(e) => setPwForm((p) => ({ ...p, old_password: e.target.value }))}
                   className="w-full h-10 px-3 border border-[#D1D5DB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033]"
                 />
               </div>

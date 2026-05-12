@@ -17,6 +17,16 @@ class UserResource extends JsonResource
             'employee_code' => $this->employee_code,
             'department_id' => $this->department_id,
             'revenue_center_id' => $this->revenue_center_id,
+            'department' => $this->whenLoaded('department', fn () => $this->department ? [
+                'id' => $this->department->id,
+                'code' => $this->department->code,
+                'name' => $this->department->name,
+            ] : null),
+            'revenue_center' => $this->whenLoaded('revenueCenter', fn () => $this->revenueCenter ? [
+                'id' => $this->revenueCenter->id,
+                'code' => $this->revenueCenter->code,
+                'name' => $this->revenueCenter->name,
+            ] : null),
             'is_active' => (bool) $this->is_active,
             'roles' => $this->getRoleNames(),
             'permissions' => $this->getAllPermissions()->pluck('name'),

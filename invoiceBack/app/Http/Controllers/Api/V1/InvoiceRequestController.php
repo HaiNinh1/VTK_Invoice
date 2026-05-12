@@ -46,6 +46,11 @@ class InvoiceRequestController extends Controller
                             ->orWhere('notes', 'like', "%{$value}%");
                     });
                 }),
+                AllowedFilter::callback('legal_incomplete', function ($q, $value) {
+                    if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                        $q->where('legal_complete', false);
+                    }
+                }),
             ])
             ->allowedSorts(...['created_at', 'request_code', 'after_vat', 'status'])
             ->defaultSort('-created_at');

@@ -23,7 +23,7 @@ export const authApi = {
   logout: () => apiPost<void>('/auth/logout'),
 
   changePassword: (payload: {
-    current_password: string;
+    old_password: string;
     new_password: string;
     new_password_confirmation: string;
   }) => apiPost<{ message: string }>('/auth/change-password', payload),

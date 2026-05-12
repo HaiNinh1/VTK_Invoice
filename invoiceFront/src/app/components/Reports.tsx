@@ -40,8 +40,8 @@ export default function Reports({ userRole = 'accountant' }: ReportsProps) {
   const legalReportQuery = useLegalComplianceReport(
     activeTab === 'legal'
       ? {
-          date_from: ddmmyyyyToIso(legalDateFrom),
-          date_to: ddmmyyyyToIso(legalDateTo),
+          from: ddmmyyyyToIso(legalDateFrom),
+          to: ddmmyyyyToIso(legalDateTo),
         }
       : undefined
   );
@@ -115,8 +115,8 @@ export default function Reports({ userRole = 'accountant' }: ReportsProps) {
     ? {
         total: legalReport.totals.total,
         complete: legalReport.totals.complete,
-        supplementing: 0,
-        insufficient: legalReport.totals.missing,
+        supplementing: legalReport.totals.supplementing,
+        insufficient: legalReport.totals.insufficient,
         overdue: legalReport.totals.overdue,
       }
     : derivedLegalStats;

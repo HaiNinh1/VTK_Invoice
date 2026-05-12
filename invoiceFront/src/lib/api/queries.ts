@@ -320,7 +320,7 @@ export function useMe() {
 export function useChangePassword() {
   return useMutation({
     mutationFn: (payload: {
-      current_password: string;
+      old_password: string;
       new_password: string;
       new_password_confirmation: string;
     }) => authApi.changePassword(payload),

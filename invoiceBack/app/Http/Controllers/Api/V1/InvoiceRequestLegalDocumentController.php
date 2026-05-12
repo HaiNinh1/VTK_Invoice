@@ -7,6 +7,7 @@ use App\Http\Resources\InvoiceRequestLegalDocumentResource;
 use App\Models\InvoiceRequest;
 use App\Models\InvoiceRequestLegalDocument;
 use App\Services\LegalComplianceService;
+use App\Models\LegalDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -28,16 +29,23 @@ class InvoiceRequestLegalDocumentController extends Controller
         $this->authorize('update', $invoiceRequest);
 
         $validated = $request->validate([
-            'document_type' => ['required', 'string', 'max:100'],
+            'legal_document_id' => ['nullable', 'integer', 'exists:legal_documents,id', 'required_without:document_type'],
+            'document_type' => ['nullable', 'string', 'max:100', 'required_without:legal_document_id'],
             'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx', 'max:10240'],
         ]);
+
+        $documentType = $validated['document_type'] ?? null;
+        if (!empty($validated['legal_document_id'])) {
+            $catalogEntry = LegalDocument::findOrFail($validated['legal_document_id']);
+            $documentType = $catalogEntry->code;
+        }
 
         $file = $validated['file'];
         $path = $file->store("legal-docs/{$invoiceRequest->id}", 'local');
 
         $document = InvoiceRequestLegalDocument::create([
             'invoice_request_id' => $invoiceRequest->id,
-            'document_type' => $validated['document_type'],
+            'document_type' => $documentType,
             'file_path' => $path,
             'original_filename' => $file->getClientOriginalName(),
             'file_size' => $file->getSize(),
