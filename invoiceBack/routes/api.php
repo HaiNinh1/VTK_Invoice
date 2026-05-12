@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\InvoiceRequestActionController;
 use App\Http\Controllers\Api\V1\InvoiceRequestController;
 use App\Http\Controllers\Api\V1\InvoiceRequestLegalDocumentController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\Reports\LegalComplianceReportController;
 use App\Http\Controllers\Api\V1\SignatureController;
 use App\Http\Controllers\Api\V1\TimelineController;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +34,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/customers/{customer}', [CustomerController::class, 'update']);
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/reports/legal-compliance', [LegalComplianceReportController::class, 'show'])
+        ->middleware('permission:report.view.company');
+    Route::post('/reports/legal-compliance/approve', [LegalComplianceReportController::class, 'approve'])
+        ->middleware('permission:report.view.company', 'require.signature');
 
     Route::get('/contracts', [ContractController::class, 'index']);
     Route::get('/contracts/{contract}', [ContractController::class, 'show']);
