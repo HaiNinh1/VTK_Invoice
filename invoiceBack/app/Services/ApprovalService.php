@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 
 class ApprovalService
 {
+    public function __construct(protected LegalComplianceService $compliance) {}
+
     /**
      * Move a draft/returned request to the correct approval branch. Creator only.
      */
@@ -28,6 +30,12 @@ class ApprovalService
         }
 
         return DB::transaction(function () use ($request, $actor) {
+            // Always recompute compliance at the moment of submission. Stops a
+            // race where the client uploads/removes a legal document and submits
+            // before the cache is refreshed.
+            $this->compliance->refresh($request);
+            $request->refresh();
+
             $step = $request->legal_complete
                 ? ApprovalStep::Accountant
                 : ApprovalStep::Director;
@@ -146,6 +154,7 @@ class ApprovalService
 
     /**
      * Determine which step `actor` is responsible for given the current request status.
+     * Enforces both the permission for the step AND the per-request handler assignment.
      */
     public function expectedStepForActor(InvoiceRequest $request, User $actor): ApprovalStep
     {
@@ -163,7 +172,29 @@ class ApprovalService
             throw new AuthorizationException("You lack permission {$step->permission()} for this step.");
         }
 
+        $this->assertAssignedHandler($request, $actor);
+
         return $step;
+    }
+
+    /**
+     * Ensure that the actor is the specifically assigned handler for the
+     * request, unless they are an admin (override) or no handler is assigned
+     * (open queue mode).
+     */
+    protected function assertAssignedHandler(InvoiceRequest $request, User $actor): void
+    {
+        if ($actor->hasRole('admin')) {
+            return; // admin override
+        }
+
+        if ($request->current_handler_id === null) {
+            return; // open queue: any permitted user may act
+        }
+
+        if ((int) $request->current_handler_id !== (int) $actor->id) {
+            throw new AuthorizationException('not_assigned_handler');
+        }
     }
 
     protected function notifyApprovers(InvoiceRequest $request, ApprovalStep $step, User $actor): void
