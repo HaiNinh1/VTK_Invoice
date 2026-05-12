@@ -11,7 +11,9 @@ use App\Http\Controllers\Api\V1\InvoiceRequestActionController;
 use App\Http\Controllers\Api\V1\InvoiceRequestController;
 use App\Http\Controllers\Api\V1\InvoiceRequestLegalDocumentController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\LegalDocumentController;
 use App\Http\Controllers\Api\V1\Reports\LegalComplianceReportController;
+use App\Http\Controllers\Api\V1\ServiceTypeController;
 use App\Http\Controllers\Api\V1\SignatureController;
 use App\Http\Controllers\Api\V1\TimelineController;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +43,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/invoice-types/{invoiceType}', [InvoiceTypeController::class, 'update']);
         Route::delete('/invoice-types/{invoiceType}', [InvoiceTypeController::class, 'destroy']);
         Route::post('/invoice-types/{invoiceType}/toggle-status', [InvoiceTypeController::class, 'toggleStatus']);
+
+        Route::get('/legal-documents', [LegalDocumentController::class, 'index']);
+        Route::post('/legal-documents', [LegalDocumentController::class, 'store']);
+        Route::get('/legal-documents/{legalDocument}', [LegalDocumentController::class, 'show']);
+        Route::put('/legal-documents/{legalDocument}', [LegalDocumentController::class, 'update']);
+        Route::delete('/legal-documents/{legalDocument}', [LegalDocumentController::class, 'destroy']);
+
+        Route::get('/service-types', [ServiceTypeController::class, 'index']);
+        Route::post('/service-types', [ServiceTypeController::class, 'store']);
+        Route::get('/service-types/{serviceType}', [ServiceTypeController::class, 'show']);
+        Route::put('/service-types/{serviceType}', [ServiceTypeController::class, 'update']);
+        Route::delete('/service-types/{serviceType}', [ServiceTypeController::class, 'destroy']);
     });
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
