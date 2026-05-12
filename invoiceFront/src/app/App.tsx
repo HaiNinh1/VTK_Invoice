@@ -33,6 +33,9 @@ import ContractManagement from './components/ContractManagement';
 import { useAuth } from '../lib/auth/AuthProvider';
 import { useNotifications, useUnreadNotificationCount } from '../lib/api/queries';
 
+// Demo role switcher is hidden in real auth flows; enable via VITE_ENABLE_DEMO_ROLE_SWITCHER=true
+const SHOW_DEMO_ROLE_SWITCHER = import.meta.env.VITE_ENABLE_DEMO_ROLE_SWITCHER === 'true';
+
 function NotificationDropdown({ isOpen, onClose, notifications, onViewAll }: any) {
   if (!isOpen) return null;
   
@@ -770,7 +773,8 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Role Switcher (Demo) */}
+                {/* Role Switcher (Demo) — gated by VITE_ENABLE_DEMO_ROLE_SWITCHER */}
+                {SHOW_DEMO_ROLE_SWITCHER && (
                 <div className="ml-4 flex gap-1 border-l pl-4 border-[#E5E7EB]">
                   <button
                     onClick={() => setUserRole('employee')}
@@ -808,6 +812,7 @@ export default function App() {
                     QT
                   </button>
                 </div>
+                )}
 
                 {/* Demo: Show Signature Setup */}
                 <div className="ml-4 border-l pl-4 border-[#E5E7EB]">
@@ -1047,7 +1052,8 @@ export default function App() {
                   ))}
                 </nav>
 
-                {/* Role Switcher in Mobile Menu */}
+                {/* Role Switcher in Mobile Menu — gated by VITE_ENABLE_DEMO_ROLE_SWITCHER */}
+                {SHOW_DEMO_ROLE_SWITCHER && (
                 <div className="p-4 border-t border-[#E5E7EB]">
                   <div className="text-xs text-[#9CA3AF] mb-2">Chuyển vai trò (Demo)</div>
                   <div className="flex gap-2 flex-wrap">
@@ -1067,6 +1073,7 @@ export default function App() {
                     ))}
                   </div>
                 </div>
+                )}
               </div>
               {/* Overlay */}
               <div className="flex-1 bg-black/30" onClick={() => setMobileMenuOpen(false)} />

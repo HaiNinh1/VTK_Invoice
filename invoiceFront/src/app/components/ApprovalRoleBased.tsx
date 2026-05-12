@@ -56,7 +56,7 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
         setActionError('Cần thiết lập chữ ký điện tử trước khi duyệt.');
         return;
       }
-      if (e.isConflict()) {
+      if (e.isAlreadyInvoiced()) {
         setActionError(e.message || 'Trạng thái đề nghị không cho phép thao tác này.');
         return;
       }

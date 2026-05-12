@@ -9,12 +9,12 @@ class InvoiceTypePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->canManage($user);
+        return true;
     }
 
     public function view(User $user, InvoiceType $invoiceType): bool
     {
-        return $this->canManage($user);
+        return true;
     }
 
     public function create(User $user): bool

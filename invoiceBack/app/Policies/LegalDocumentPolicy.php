@@ -9,12 +9,12 @@ class LegalDocumentPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->canManage($user);
+        return true;
     }
 
     public function view(User $user, LegalDocument $legalDocument): bool
     {
-        return $this->canManage($user);
+        return true;
     }
 
     public function create(User $user): bool

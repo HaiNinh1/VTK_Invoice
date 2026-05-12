@@ -36,23 +36,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/customers/{customer}', [CustomerController::class, 'show']);
     Route::put('/customers/{customer}', [CustomerController::class, 'update']);
 
+    // Catalog READ — any authenticated user (needed by invoice creation forms)
+    Route::get('/invoice-types', [InvoiceTypeController::class, 'index']);
+    Route::get('/invoice-types/{invoiceType}', [InvoiceTypeController::class, 'show']);
+    Route::get('/legal-documents', [LegalDocumentController::class, 'index']);
+    Route::get('/legal-documents/{legalDocument}', [LegalDocumentController::class, 'show']);
+    Route::get('/service-types', [ServiceTypeController::class, 'index']);
+    Route::get('/service-types/{serviceType}', [ServiceTypeController::class, 'show']);
+
+    // Catalog WRITE — admin / catalog-manager only
     Route::middleware('role_or_permission:admin|catalog.manage|invoice_type.manage')->group(function () {
-        Route::get('/invoice-types', [InvoiceTypeController::class, 'index']);
         Route::post('/invoice-types', [InvoiceTypeController::class, 'store']);
-        Route::get('/invoice-types/{invoiceType}', [InvoiceTypeController::class, 'show']);
         Route::put('/invoice-types/{invoiceType}', [InvoiceTypeController::class, 'update']);
         Route::delete('/invoice-types/{invoiceType}', [InvoiceTypeController::class, 'destroy']);
         Route::post('/invoice-types/{invoiceType}/toggle-status', [InvoiceTypeController::class, 'toggleStatus']);
 
-        Route::get('/legal-documents', [LegalDocumentController::class, 'index']);
         Route::post('/legal-documents', [LegalDocumentController::class, 'store']);
-        Route::get('/legal-documents/{legalDocument}', [LegalDocumentController::class, 'show']);
         Route::put('/legal-documents/{legalDocument}', [LegalDocumentController::class, 'update']);
         Route::delete('/legal-documents/{legalDocument}', [LegalDocumentController::class, 'destroy']);
 
-        Route::get('/service-types', [ServiceTypeController::class, 'index']);
         Route::post('/service-types', [ServiceTypeController::class, 'store']);
-        Route::get('/service-types/{serviceType}', [ServiceTypeController::class, 'show']);
         Route::put('/service-types/{serviceType}', [ServiceTypeController::class, 'update']);
         Route::delete('/service-types/{serviceType}', [ServiceTypeController::class, 'destroy']);
     });

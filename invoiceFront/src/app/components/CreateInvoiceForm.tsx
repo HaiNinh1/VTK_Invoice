@@ -93,7 +93,7 @@ export default function CreateInvoiceForm({
     if (!customerId) errs.customer_id = 'Vui lòng chọn khách hàng';
     if (!invoiceTypeId) errs.invoice_type_id = 'Vui lòng chọn loại hóa đơn';
     if (!serviceTypeId) errs.service_type_id = 'Vui lòng chọn loại dịch vụ';
-    if (!beforeVAT || beforeVAT <= 0) errs.amount_before_vat = 'Vui lòng nhập số tiền trước thuế';
+    if (!beforeVAT || beforeVAT <= 0) errs.before_vat = 'Vui lòng nhập số tiền trước thuế';
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -105,10 +105,9 @@ export default function CreateInvoiceForm({
       service_type_id: Number(serviceTypeId),
       contract_id: contractId === '' ? null : Number(contractId),
       payment_installment_id: installmentId === '' ? null : Number(installmentId),
-      amount_before_vat: beforeVAT,
+      before_vat: beforeVAT,
       tax_rate: taxRate,
-      vat_amount: vatAmount,
-      amount_after_vat: afterVAT,
+      after_vat: afterVAT,
       notes: notes || undefined,
     };
   }
@@ -331,14 +330,14 @@ export default function CreateInvoiceForm({
             <input
               type="text"
               inputMode="numeric"
-              className={`${inputBase} ${fieldError('amount_before_vat') ? 'border-[#DC2626]' : 'border-[#D1D5DB]'} text-right`}
+              className={`${inputBase} ${fieldError('before_vat') ? 'border-[#DC2626]' : 'border-[#D1D5DB]'} text-right`}
               value={beforeVATText}
               onChange={(e) => setBeforeVATText(formatVnNumber(e.target.value))}
               placeholder="0"
             />
-            {fieldError('amount_before_vat') && (
+            {fieldError('before_vat') && (
               <div className={errorBase}>
-                <AlertCircle size={12} /> {fieldError('amount_before_vat')}
+                <AlertCircle size={12} /> {fieldError('before_vat')}
               </div>
             )}
           </div>
