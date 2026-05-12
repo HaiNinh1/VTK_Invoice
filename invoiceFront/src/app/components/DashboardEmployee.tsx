@@ -1,5 +1,5 @@
 import { FileText, Clock, AlertTriangle, CheckCircle, ArrowUpRight } from 'lucide-react';
-import { MASTER_INVOICE_DATA, getMonthlyStats, getRecentRequests } from '../data/masterInvoiceData';
+import { useMasterInvoiceData } from '../data/masterInvoiceData';
 
 interface DashboardEmployeeProps {
   getStatusBadge: (status: string) => JSX.Element;
@@ -7,6 +7,7 @@ interface DashboardEmployeeProps {
 }
 
 export default function DashboardEmployee({ getStatusBadge, getLegalIcon }: DashboardEmployeeProps) {
+  const { MASTER_INVOICE_DATA, getMonthlyStats, getRecentRequests } = useMasterInvoiceData();
   // Filter data for current employee (Nguyễn Văn A)
   const myRecords = MASTER_INVOICE_DATA.filter(r => r.creator === 'Nguyễn Văn A');
   const myPending = myRecords.filter(r => r.status === 'pending');

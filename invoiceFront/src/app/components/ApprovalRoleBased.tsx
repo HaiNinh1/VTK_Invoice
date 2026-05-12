@@ -7,27 +7,107 @@ import {
 import { getInvoiceStatusBadge, getLegalStatusIcon } from './StatusBadges';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
 import { Button } from './ui/button';
-import { MASTER_INVOICE_DATA } from '../data/masterInvoiceData';
+import { useMasterInvoiceData } from '../data/masterInvoiceData';
+import {
+  useApproveInvoiceRequest,
+  useRejectInvoiceRequest,
+  useReturnInvoiceRequest,
+  useSignature,
+} from '../../lib/api/queries';
+import { ApiError } from '../../lib/api/errors';
 
 interface ApprovalRoleBasedProps {
   userRole: 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
 }
 
 export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) {
+  const { MASTER_INVOICE_DATA } = useMasterInvoiceData();
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected' | 'overview'>('pending');
   const [view, setView] = useState<'queue' | 'detail'>('queue');
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const [hasSignature, setHasSignature] = useState(true);
+  const [hasSignature] = useState(true); // legacy fallback; replaced below by real signature check
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [actionTargetId, setActionTargetId] = useState<string>('');
+  const [actionTargetId, setActionTargetId] = useState<string | number>('');
   const [showCommitmentApproveModal, setShowCommitmentApproveModal] = useState(false);
   const [commitmentAcknowledged, setCommitmentAcknowledged] = useState(false);
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [showLegalDetailModal, setShowLegalDetailModal] = useState(false);
-  const [legalDetailTargetId, setLegalDetailTargetId] = useState<string>('');
+  const [legalDetailTargetId, setLegalDetailTargetId] = useState<string | number>('');
+
+  // --- Real backend mutations ---
+  const approveMut = useApproveInvoiceRequest();
+  const rejectMut = useRejectInvoiceRequest();
+  const returnMut = useReturnInvoiceRequest();
+  const { data: sig } = useSignature();
+  const hasRealSignature = !!(sig as any)?.signature_image_url || !!(sig as any)?.has_signature;
+  const isSignatureReady = hasRealSignature || hasSignature;
+
+  const [returnReason, setReturnReason] = useState('');
+  const [approveComment] = useState<string | undefined>(undefined);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const isActing = approveMut.isPending || rejectMut.isPending || returnMut.isPending;
+
+  function handleApiActionError(e: unknown) {
+    if (e instanceof ApiError) {
+      if (e.isSignatureRequired()) {
+        setActionError('Cần thiết lập chữ ký điện tử trước khi duyệt.');
+        return;
+      }
+      if (e.isConflict()) {
+        setActionError(e.message || 'Trạng thái đề nghị không cho phép thao tác này.');
+        return;
+      }
+      setActionError(e.message);
+      return;
+    }
+    setActionError('Có lỗi xảy ra. Vui lòng thử lại.');
+  }
+
+  async function doApprove() {
+    if (!actionTargetId) return;
+    setActionError(null);
+    try {
+      await approveMut.mutateAsync({ id: actionTargetId, payload: { comment: approveComment } });
+      setShowApproveModal(false);
+    } catch (e) {
+      handleApiActionError(e);
+    }
+  }
+
+  async function doReturn() {
+    if (!actionTargetId) return;
+    if (!returnReason.trim()) {
+      setActionError('Vui lòng nhập lý do trả lại.');
+      return;
+    }
+    setActionError(null);
+    try {
+      await returnMut.mutateAsync({ id: actionTargetId, payload: { reason: returnReason.trim() } });
+      setShowRejectModal(false);
+      setReturnReason('');
+    } catch (e) {
+      handleApiActionError(e);
+    }
+  }
+
+  async function doApproveWithCommitment() {
+    if (!actionTargetId) return;
+    setActionError(null);
+    try {
+      await approveMut.mutateAsync({
+        id: actionTargetId,
+        payload: { comment: 'Duyệt với cam kết bổ sung hồ sơ pháp lý' },
+      });
+      setShowCommitmentApproveModal(false);
+      setCommitmentAcknowledged(false);
+      setRiskAcknowledged(false);
+    } catch (e) {
+      handleApiActionError(e);
+    }
+  }
 
   // === LEGAL CHECKLIST TEMPLATE (11 items, 4 groups) ===
   const LEGAL_GROUPS = [
@@ -787,10 +867,11 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
               <Button variant="outline">Huỷ</Button>
             </DialogClose>
             <Button
-              className="bg-[#EE0033] hover:bg-[#CC002B] text-white"
-              onClick={() => setShowApproveModal(false)}
+              className="bg-[#EE0033] hover:bg-[#CC002B] text-white disabled:opacity-50"
+              disabled={isActing}
+              onClick={doApprove}
             >
-              Xác nhận duyệt 
+              {approveMut.isPending ? 'Đang duyệt...' : 'Xác nhận duyệt'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -811,7 +892,15 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
           <div className="p-6 space-y-4">
             <div>
               <label className="text-sm font-medium text-gray-700">Lý do từ chối / trả lại *</label>
-              <textarea className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033] outline-none" placeholder="Nhập lý do..." />
+              <textarea
+                className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033] outline-none"
+                placeholder="Nhập lý do..."
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+              />
+              {actionError && (
+                <div className="mt-2 text-xs text-[#DC2626]">{actionError}</div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -819,10 +908,11 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
               <Button variant="outline">Huỷ</Button>
             </DialogClose>
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white"
-              onClick={() => setShowRejectModal(false)}
+              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+              disabled={isActing || !returnReason.trim()}
+              onClick={doReturn}
             >
-              Xác nhận từ chối
+              {returnMut.isPending ? 'Đang trả lại...' : 'Xác nhận trả lại'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1044,11 +1134,11 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
             </DialogClose>
             <Button
               className="bg-[#D97706] hover:bg-[#B45309] text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => { setShowCommitmentApproveModal(false); setCommitmentAcknowledged(false); setRiskAcknowledged(false); }}
-              disabled={!commitmentAcknowledged || !riskAcknowledged}
+              onClick={doApproveWithCommitment}
+              disabled={isActing || !commitmentAcknowledged || !riskAcknowledged}
             >
               <AlertTriangle size={14} className="mr-1.5" />
-              Duyệt có cam kết
+              {approveMut.isPending ? 'Đang duyệt...' : 'Duyệt có cam kết'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,11 +1,18 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Check, Upload, Edit3, Undo2, Trash2, ArrowRight, Lock } from 'lucide-react';
+import { useUpdateSignature } from '../../lib/api/queries';
+import { ApiError } from '../../lib/api/errors';
 
-export default function FirstTimeSignatureSetup() {
+interface FirstTimeSignatureSetupProps {
+  onComplete?: () => void;
+}
+
+export default function FirstTimeSignatureSetup({ onComplete }: FirstTimeSignatureSetupProps = {}) {
   const [activeTab, setActiveTab] = useState<'draw' | 'text' | 'upload'>('draw');
   const [selectedFont, setSelectedFont] = useState<'script' | 'serif' | 'handwritten' | 'sans'>('script');
   const [textSignature, setTextSignature] = useState('Nguyễn Văn A');
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,6 +74,7 @@ export default function FirstTimeSignatureSetup() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setUploadedFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setUploadedImage(event.target?.result as string);
@@ -84,9 +92,49 @@ export default function FirstTimeSignatureSetup() {
     return false;
   };
 
-  const handleComplete = () => {
-    alert('Chữ ký đã được thiết lập thành công! Chuyển đến trang chủ...');
-    // In real app: save signature and navigate to dashboard
+  // Convert canvas to a PNG File so we can multipart-upload it
+  const canvasToFile = async (canvas: HTMLCanvasElement, filename = 'signature.png'): Promise<File> =>
+    new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('Cannot serialize canvas'));
+        resolve(new File([blob], filename, { type: 'image/png' }));
+      }, 'image/png');
+    });
+
+  const updateSig = useUpdateSignature();
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleComplete = async () => {
+    setSaveError(null);
+    try {
+      if (activeTab === 'draw') {
+        if (!canvasRef.current || !hasSignature) {
+          setSaveError('Vui lòng vẽ chữ ký trước khi lưu.');
+          return;
+        }
+        const file = await canvasToFile(canvasRef.current);
+        await updateSig.mutateAsync({ method: 'draw', file });
+      } else if (activeTab === 'text') {
+        if (!textSignature.trim()) {
+          setSaveError('Vui lòng nhập tên trước khi lưu.');
+          return;
+        }
+        await updateSig.mutateAsync({ method: 'text', text: textSignature.trim() });
+      } else {
+        if (!uploadedFile) {
+          setSaveError('Vui lòng tải ảnh chữ ký lên trước khi lưu.');
+          return;
+        }
+        await updateSig.mutateAsync({ method: 'upload', file: uploadedFile });
+      }
+      onComplete?.();
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setSaveError(e.message || 'Không thể lưu chữ ký. Vui lòng thử lại.');
+      } else {
+        setSaveError('Không thể lưu chữ ký. Vui lòng thử lại.');
+      }
+    }
   };
 
   return (
@@ -384,6 +432,7 @@ export default function FirstTimeSignatureSetup() {
                       <button
                         onClick={() => {
                           setUploadedImage(null);
+                          setUploadedFile(null);
                           setHasSignature(false);
                         }}
                         className="h-9 px-4 bg-white border border-[#D1D5DB] text-[#374151] rounded-lg text-sm font-medium hover:bg-[#F9FAFB] flex items-center gap-2"
@@ -474,16 +523,19 @@ export default function FirstTimeSignatureSetup() {
           </div>
 
           {/* BOTTOM ACTIONS */}
+          {saveError && (
+            <div className="mb-3 text-sm text-[#DC2626] text-center">{saveError}</div>
+          )}
           <button
             onClick={handleComplete}
-            disabled={!isSignatureComplete()}
+            disabled={!isSignatureComplete() || updateSig.isPending}
             className={`w-full h-12 rounded-lg text-base font-semibold flex items-center justify-center gap-2 transition-all ${
-              isSignatureComplete()
+              isSignatureComplete() && !updateSig.isPending
                 ? 'bg-[#DC2626] text-white hover:bg-[#B91C1C] cursor-pointer shadow-sm'
                 : 'bg-[#D1D5DB] text-[#6B7280] cursor-not-allowed'
             }`}
           >
-            <span>Hoàn tất thiết lập</span>
+            <span>{updateSig.isPending ? 'Đang lưu...' : 'Hoàn tất thiết lập'}</span>
             <ArrowRight size={16} />
           </button>
 

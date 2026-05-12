@@ -3,7 +3,7 @@ import {
   Clock, RefreshCw, CheckCircle, AlertTriangle, Eye, RotateCcw, 
   FileText, ChevronDown, ChevronUp, Search, Filter, X, Download
 } from 'lucide-react';
-import { MASTER_INVOICE_DATA } from '../data/masterInvoiceData';
+import { useMasterInvoiceData } from '../data/masterInvoiceData';
 import type { InvoiceRequest } from '../data/masterInvoiceData';
 
 interface AccountingVFSProps {
@@ -53,6 +53,7 @@ function AccountingStatusBadge({ status }: { status: 'pending' | 'processing' | 
 }
 
 export default function AccountingVFS({ viewport }: AccountingVFSProps) {
+  const { MASTER_INVOICE_DATA } = useMasterInvoiceData();
   const [filterExpanded, setFilterExpanded] = useState(true);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);

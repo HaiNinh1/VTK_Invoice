@@ -7,7 +7,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { MASTER_INVOICE_DATA } from '../data/masterInvoiceData';
+import { useMasterInvoiceData } from '../data/masterInvoiceData';
 
 interface DashboardManagerProps {
   getStatusBadge: (status: string) => JSX.Element;
@@ -15,6 +15,7 @@ interface DashboardManagerProps {
 }
 
 export default function DashboardManager({ getStatusBadge, getLegalIcon }: DashboardManagerProps) {
+  const { MASTER_INVOICE_DATA } = useMasterInvoiceData();
   // Filter data for KV3 (TT Khu vực 3) department
   const kv3Records = MASTER_INVOICE_DATA.filter(r => r.revenueCenter === 'KV3');
   

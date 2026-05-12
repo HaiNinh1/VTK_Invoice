@@ -8,7 +8,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import CenterReport from './CenterReport';
-import { MASTER_INVOICE_DATA, getLegalStats } from '../data/masterInvoiceData';
+import { useMasterInvoiceData } from '../data/masterInvoiceData';
 
 type UserRole = 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
 
@@ -17,6 +17,7 @@ interface ReportsProps {
 }
 
 export default function Reports({ userRole = 'accountant' }: ReportsProps) {
+  const { MASTER_INVOICE_DATA, getLegalStats } = useMasterInvoiceData();
   const [activeTab, setActiveTab] = useState<'revenue' | 'legal' | 'center' | 'reconciliation'>('revenue');
   const [timePeriod, setTimePeriod] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedCenter, setSelectedCenter] = useState<string | null>(null);

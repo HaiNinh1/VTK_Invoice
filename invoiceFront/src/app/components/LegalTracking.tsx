@@ -6,7 +6,7 @@ import {
   XCircle, MinusCircle, Activity, Shield, Settings,
   UserCheck, Send, RotateCcw, Info
 } from 'lucide-react';
-import { MASTER_INVOICE_DATA, getCommitmentRecords } from '../data/masterInvoiceData';
+import { useMasterInvoiceData } from '../data/masterInvoiceData';
 
 type UserRole = 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
 
@@ -60,6 +60,7 @@ const getRoleLabel = (role: UserRole) => {
 };
 
 export default function LegalTracking({ userRole }: LegalTrackingProps) {
+  const { MASTER_INVOICE_DATA, getCommitmentRecords } = useMasterInvoiceData();
   const permissions = getRolePermissions(userRole);
   const roleInfo = getRoleLabel(userRole);
 

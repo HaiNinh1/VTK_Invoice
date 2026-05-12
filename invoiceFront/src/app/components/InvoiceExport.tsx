@@ -5,13 +5,14 @@ import {
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
 import { Button } from './ui/button';
-import { MASTER_INVOICE_DATA } from '../data/masterInvoiceData';
+import { useMasterInvoiceData } from '../data/masterInvoiceData';
 
 interface InvoiceExportProps {
   userRole: 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
 }
 
 export default function InvoiceExport({ userRole }: InvoiceExportProps) {
+  const { MASTER_INVOICE_DATA } = useMasterInvoiceData();
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'excel'>('pdf');
   const [templateType, setTemplateType] = useState<'standard' | 'detailed' | 'simple'>('standard');

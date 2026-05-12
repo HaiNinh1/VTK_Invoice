@@ -12,13 +12,14 @@ import DashboardEmployee from './components/DashboardEmployee';
 import DashboardManager from './components/DashboardManager';
 import AccountingVFS from './components/AccountingVFS';
 import CreateInvoiceRoleBased from './components/CreateInvoiceRoleBased';
+import CreateInvoiceForm from './components/CreateInvoiceForm';
 import Approval from './components/Approval';
 import LegalTracking from './components/LegalTracking';
 import Settings from './components/Settings';
 import UserProfile from './components/UserProfile';
 import FirstTimeSignatureSetup from './components/FirstTimeSignatureSetup';
 import FirstTimeSignatureSetupDemo from './components/FirstTimeSignatureSetupDemo';
-import { MASTER_INVOICE_DATA, getPendingApprovals } from './data/masterInvoiceData';
+import { useMasterInvoiceData } from './data/masterInvoiceData';
 import { getInvoiceStatusBadge, getLegalStatusIcon } from './components/StatusBadges';
 import Monitoring from './components/Monitoring';
 import Reports from './components/Reports';
@@ -29,6 +30,8 @@ import ScreenMap from './components/ScreenMap';
 import InvoiceExport from './components/InvoiceExport';
 import InvoiceTypeManagement from './components/InvoiceTypeManagement';
 import ContractManagement from './components/ContractManagement';
+import { useAuth } from '../lib/auth/AuthProvider';
+import { useNotifications, useUnreadNotificationCount } from '../lib/api/queries';
 
 function NotificationDropdown({ isOpen, onClose, notifications, onViewAll }: any) {
   if (!isOpen) return null;
@@ -65,10 +68,13 @@ function NotificationDropdown({ isOpen, onClose, notifications, onViewAll }: any
 }
 
 export default function App() {
+  const { MASTER_INVOICE_DATA, getPendingApprovals } = useMasterInvoiceData();
+  const { data: notificationData } = useNotifications({ per_page: 10 });
+  const { count: unreadNotificationCount } = useUnreadNotificationCount();
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [activeNav, setActiveNav] = useState('screen-map'); // Start with screen map
+  const [activeNav, setActiveNav] = useState('dashboard');
   const [filterExpanded, setFilterExpanded] = useState(true);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
@@ -83,32 +89,32 @@ export default function App() {
   const [formStatus, setFormStatus] = useState<'draft' | 'pending' | 'approved' | 'rejected' | 'returned' | 'issued'>('draft');
   const [formIsOwner, setFormIsOwner] = useState(true);
 
-  // User role and data scope state
-  const [userRole, setUserRole] = useState<'employee' | 'manager' | 'accountant' | 'director' | 'admin'>('director');
-  const [dataFilter, setDataFilter] = useState<string>('company-wide'); // For company-wide filter
+  // Auth wiring — user/role come from backend (no more hardcoded values)
+  const auth = useAuth();
+
+  // User role and data scope state — initialized from auth, kept in local state for the demo role switcher
+  const [userRole, setUserRole] = useState<'employee' | 'manager' | 'accountant' | 'director' | 'admin'>(auth.primaryRole);
+  const [dataFilter, setDataFilter] = useState<string>('company-wide');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
-  
-  // Current user with department info
-  const [currentUser] = useState({
-    name: "Nguyễn Văn A",
+
+  // Sync local userRole with backend role when auth.user changes (login / refresh)
+  useEffect(() => {
+    setUserRole(auth.primaryRole);
+  }, [auth.primaryRole]);
+
+  // Current user derived from backend user payload
+  const currentUser = {
+    name: auth.user?.name ?? '—',
     role: userRole,
-    department: "TT Khu vực 3",
-    title: "Trưởng TT Khu vực 3"
-  });
+    department: auth.user?.department?.name ?? auth.user?.revenue_center?.name ?? '—',
+    title: auth.user?.department?.name ?? auth.user?.revenue_center?.name ?? '—',
+  };
   
   // Calculate dynamic badge counts from master data
   const pendingRequestsCount = getPendingApprovals().length; // Count of "Đề nghị duyệt" status
   const pendingApprovalsCount = getPendingApprovals().length; // Same for now (would filter by user's role in real app)
 
-  // Calculate unread notification count dynamically
-  const getUnreadNotificationCount = () => {
-    const pendingApprovals = MASTER_INVOICE_DATA.filter(r => r.status === 'pending').length;
-    const overdueLegal = MASTER_INVOICE_DATA.filter(r => r.legalStatus.status === 'overdue').length;
-    const systemErrors = MASTER_INVOICE_DATA.filter(r => r.sInvoiceStatus === 'error').length;
-    return pendingApprovals + overdueLegal + systemErrors;
-  };
-
-  const unreadNotificationCount = getUnreadNotificationCount();
+  // Notifications & unread badge — driven by backend
 
   // Get breadcrumb based on active navigation
   const getBreadcrumb = () => {
@@ -266,17 +272,30 @@ export default function App() {
     { id: 'DN-2026-00138', customer: 'VNPT Technology', amount: '6.200.000.000', creator: 'Bùi Thị H', status: 'approved', legal: 'complete', date: '10/03/2026' }
   ];
 
-  // Notifications data
-  const notifications = [
-    { id: '1', type: 'approval' as const, title: 'Đề nghị DN-2026-00145 đã được duyệt', message: 'Duyệt bởi Trần Thị B lúc 15:42', time: '2 phút trước', read: false },
-    { id: '2', type: 'legal' as const, title: 'Hồ sơ BB nghiệm thu HĐ-089 quá hạn 5 ngày', message: 'Cần bổ sung ngay biên bản nghiệm thu', time: '1 giờ trưc', read: false, priority: 'high' },
-    { id: '3', type: 'system' as const, title: '3 hoá đơn mới đã xuất trên S-Invoice', message: 'DN-2026-00142, DN-2026-00143, DN-2026-00144', time: '3 giờ trước', read: true },
-    { id: '4', type: 'approval' as const, title: 'Đề nghị DN-2026-00140 được trả lại', message: 'Cần bổ sung BB quyết toán', time: '5 giờ trước', read: true },
-    { id: '5', type: 'system' as const, title: 'Lỗi xuất HĐ DN-2026-00138: MST không hợp lệ', message: 'Kiểm tra lại mã số thuế chủ đầu tư', time: 'hôm qua', read: false, priority: 'high' },
-    { id: '6', type: 'legal' as const, title: 'Cam kết CK-2026-00089 còn 3 ngày nữa đến hạn', message: 'Người cam kết: Nguyễn Văn A', time: 'hôm qua', read: true },
-    { id: '7', type: 'system' as const, title: 'Hạch toán VFS hoàn thành cho DN-2026-00135', message: 'Đã đồng bộ thành công lên VFS', time: '2 ngày trước', read: true },
-    { id: '8', type: 'system' as const, title: 'Phạm Văn C đã thiết lập chữ ký điện tử', message: 'Quản trị viên - Admin', time: '3 ngày trước', read: true }
-  ];
+  // Map backend notifications to the legacy shape consumed by NotificationDropdown
+  const notifications = (notificationData?.data ?? []).map((n: any) => {
+    const title =
+      (typeof n.data === 'object' && (n.data.title || n.data.message)) ||
+      n.type ||
+      'Thông báo';
+    const message =
+      (typeof n.data === 'object' && (n.data.message || n.data.body || n.data.invoice_request_code)) ||
+      '';
+    return {
+      id: n.id,
+      type: (n.type?.toLowerCase().includes('approv')
+        ? 'approval'
+        : n.type?.toLowerCase().includes('legal')
+          ? 'legal'
+          : 'system') as 'approval' | 'legal' | 'system',
+      title,
+      message,
+      time: n.created_at
+        ? new Date(n.created_at).toLocaleString('vi-VN')
+        : '',
+      read: !!n.read_at,
+    };
+  });
 
   // Show onboarding screen if activeNav is 'onboarding'
   if (activeNav === 'onboarding') {
@@ -530,10 +549,10 @@ export default function App() {
               >
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-full bg-[#D1D5DB] flex items-center justify-center text-[#374151] text-sm font-medium flex-shrink-0">
-                    NV
+                    {(currentUser.name || '?').trim().split(/\s+/).slice(-2).map(s => s[0]).join('').toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-[#111827] mb-1">Nguyễn Văn A</div>
+                    <div className="text-sm font-medium text-[#111827] mb-1">{currentUser.name}</div>
                     <div 
                       className="inline-flex items-center h-5 px-2 rounded text-xs font-medium mb-1"
                       style={{ 
@@ -543,7 +562,7 @@ export default function App() {
                     >
                       {roleConfig[userRole].label}
                     </div>
-                    <div className="text-xs text-[#9CA3AF]">P. Kỹ thuật Công ngh</div>
+                    <div className="text-xs text-[#9CA3AF]">{currentUser.department}</div>
                   </div>
                 </div>
               </button>
@@ -663,9 +682,9 @@ export default function App() {
                     className="hidden md:flex items-center gap-2 hover:bg-[#F3F4F6] rounded-lg px-2 py-1.5 transition-colors"
                   >
                     <div className="w-8 h-8 rounded-full bg-[#D1D5DB] flex items-center justify-center text-[#374151] text-xs font-medium">
-                      NV
+                      {(currentUser.name || '?').trim().split(/\s+/).slice(-2).map(s => s[0]).join('').toUpperCase()}
                     </div>
-                    <span className="text-sm font-medium text-[#374151]">Nguyễn Văn A</span>
+                    <span className="text-sm font-medium text-[#374151]">{currentUser.name}</span>
                     <ChevronDown size={16} className={`text-[#6B7280] transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -715,10 +734,10 @@ export default function App() {
                         </button>
                         <div className="h-px bg-[#E5E7EB] my-1"></div>
                         <button
-                          onClick={() => {
-                            setUserDropdownOpen(false);
-                            // Handle logout
-                          }}
+                        onClick={async () => {
+                          setUserDropdownOpen(false);
+                          await auth.logout();
+                        }}
                           className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[#EE0033] hover:bg-[#FFF1F3] rounded-lg transition-colors"
                         >
                           <LogOut size={16} className="text-[#EE0033]" />
@@ -979,10 +998,10 @@ export default function App() {
                 <div className="p-4 border-b border-[#E5E7EB]">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-[#D1D5DB] flex items-center justify-center text-[#374151] text-sm font-medium">
-                      NV
+                      {(currentUser.name || '?').trim().split(/\s+/).slice(-2).map(s => s[0]).join('').toUpperCase()}
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-[#111827]">Nguyễn Văn A</div>
+                      <div className="text-sm font-medium text-[#111827]">{currentUser.name}</div>
                       <div 
                         className="inline-flex items-center h-5 px-2 rounded text-xs font-medium mt-1"
                         style={{ backgroundColor: roleConfig[userRole].bgColor, color: roleConfig[userRole].textColor }}
@@ -1069,15 +1088,12 @@ export default function App() {
             {activeNav === 'invoices' && (
               <>
                 {showCreateInvoice ? (
-                  <CreateInvoiceRoleBased
+                  <CreateInvoiceForm
                     onBack={() => setShowCreateInvoice(false)}
-                    requestId="DN-2026-00156"
-                    status={formStatus}
-                    isOwner={formIsOwner}
-                    userRole={userRole}
-                    onNavigateToView={(view) => {
+                    onCreated={() => setShowCreateInvoice(false)}
+                    onSignatureRequired={() => {
                       setShowCreateInvoice(false);
-                      setActiveNav(view);
+                      setActiveNav('signature');
                     }}
                   />
                 ) : (

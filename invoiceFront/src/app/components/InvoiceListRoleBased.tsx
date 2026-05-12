@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { formatVND, truncateText, emptyCell } from '../utils/formatters';
 import TableSkeleton from './TableSkeleton';
-import { MASTER_INVOICE_DATA } from '../data/masterInvoiceData';
+import { useMasterInvoiceData } from '../data/masterInvoiceData';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
 import { Button } from './ui/button';
 
@@ -23,6 +23,7 @@ export default function InvoiceListRoleBased({
   onCreateNew,
   userRole 
 }: InvoiceListRoleBasedProps) {
+  const { MASTER_INVOICE_DATA } = useMasterInvoiceData();
   const [filterExpanded, setFilterExpanded] = useState(true);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);

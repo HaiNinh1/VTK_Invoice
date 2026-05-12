@@ -7,7 +7,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { MASTER_INVOICE_DATA, getMonthlyStats, getRecentRequests, getLegalStats } from '../data/masterInvoiceData';
+import { useMasterInvoiceData } from '../data/masterInvoiceData';
 
 interface DashboardCompanyProps {
   getStatusBadge: (status: string) => JSX.Element;
@@ -15,6 +15,7 @@ interface DashboardCompanyProps {
 }
 
 export default function DashboardCompany({ getStatusBadge, getLegalIcon }: DashboardCompanyProps) {
+  const { MASTER_INVOICE_DATA, getMonthlyStats, getRecentRequests, getLegalStats } = useMasterInvoiceData();
   const [dataFilter, setDataFilter] = useState<string>('company-wide');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
 
