@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\ApprovalController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\CommitmentController;
 use App\Http\Controllers\Api\V1\ContractController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\DashboardController;
@@ -62,6 +63,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/invoice-requests/{invoiceRequest}/legal-documents', [InvoiceRequestLegalDocumentController::class, 'index']);
     Route::post('/invoice-requests/{invoiceRequest}/legal-documents', [InvoiceRequestLegalDocumentController::class, 'store']);
     Route::delete('/invoice-requests/{invoiceRequest}/legal-documents/{document}', [InvoiceRequestLegalDocumentController::class, 'destroy']);
+
+    Route::get('/invoice-requests/{invoiceRequest}/commitments', [CommitmentController::class, 'index']);
+    Route::post('/invoice-requests/{invoiceRequest}/commitments', [CommitmentController::class, 'store'])
+        ->middleware('permission:commitment.create', 'require.signature');
+    Route::get('/commitments/{commitment}', [CommitmentController::class, 'show']);
+    Route::post('/commitments/{commitment}/extend', [CommitmentController::class, 'extend'])
+        ->middleware('permission:commitment.extend', 'require.signature');
+    Route::post('/commitments/{commitment}/decide', [CommitmentController::class, 'decide'])
+        ->middleware('permission:commitment.approve', 'require.signature');
+    Route::post('/commitments/{commitment}/remind', [CommitmentController::class, 'remind'])
+        ->middleware('permission:commitment.remind');
 
     // Approval queue
     Route::get('/approvals/pending', [ApprovalController::class, 'pending']);
