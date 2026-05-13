@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut, unwrap } from '../client';
+import { apiDelete, apiGet, apiPost, unwrap } from '../client';
 
 export interface UserSignature {
   id?: number;
@@ -13,8 +13,13 @@ export const signatureApi = {
     try {
       const raw = await apiGet<unknown>('/me/signature');
       return unwrap<UserSignature>(raw);
-    } catch {
-      return null;
+    } catch (err: unknown) {
+      // Only swallow 404 (= no signature on file). Re-throw everything else
+      // (network/401/403/500) so callers can react properly.
+      const status = (err as { status?: number; response?: { status?: number } })?.status
+        ?? (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404) return null;
+      throw err;
     }
   },
 

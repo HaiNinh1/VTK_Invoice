@@ -16,9 +16,16 @@ interface DashboardCompanyProps {
 }
 
 export default function DashboardCompany({ getStatusBadge, getLegalIcon }: DashboardCompanyProps) {
-  const { MASTER_INVOICE_DATA, getMonthlyStats, getRecentRequests, getLegalStats } = useMasterInvoiceData();
+  const { MASTER_INVOICE_DATA, getMonthlyStats, getRecentRequests, getLegalStats, isLoading, isError } = useMasterInvoiceData();
   const [dataFilter, setDataFilter] = useState<string>('company-wide');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+
+  if (isLoading) {
+    return <div className="p-8 text-sm text-[#6B7280]">Đang tải dữ liệu…</div>;
+  }
+  if (isError) {
+    return <div className="p-8 text-sm text-[#DC2626]">Không tải được dữ liệu. Vui lòng thử lại.</div>;
+  }
 
   // Derive stats from master data
   const stats = getMonthlyStats();

@@ -71,6 +71,8 @@ function formatDate(iso?: string | null): string {
 
 function mapStatus(api: string): InvoiceRequest['status'] {
   // Map every backend kebab/snake variant onto the legacy union the UI knows.
+  // Backend emits: draft, pending (=accountant stage), pending-vpgd (=director stage),
+  //                approved, rejected, returned, resubmitted, issued, cancelled.
   switch (api) {
     case 'draft':
       return 'draft';
@@ -99,7 +101,8 @@ function mapStatus(api: string): InvoiceRequest['status'] {
 }
 
 function mapLegalStatus(b: BackendInvoiceRequest): InvoiceRequest['legalStatus'] {
-  const cache = (b.legal_status_cache ?? {}) as {
+  // Backend now returns `legal_status` (was `legal_status_cache`). Tolerate both for safety.
+  const cache = ((b.legal_status ?? (b as unknown as { legal_status_cache?: unknown }).legal_status_cache) ?? {}) as {
     completed?: number;
     total?: number;
     status?: string;
@@ -114,26 +117,87 @@ function mapLegalStatus(b: BackendInvoiceRequest): InvoiceRequest['legalStatus']
   return { completed, total, status };
 }
 
+function mapSInvoice(s: string | null | undefined): InvoiceRequest['sInvoiceStatus'] {
+  switch (s) {
+    case 'completed':
+    case 'issued':
+      return 'completed';
+    case 'sent_to_cqt':
+    case 'sent-to-cqt':
+      return 'sent-to-cqt';
+    case 'error':
+      return 'error';
+    case 'pending':
+    case 'pushing':
+      return 'pending';
+    default:
+      return 'none';
+  }
+}
+
+function mapVfs(s: string | null | undefined): InvoiceRequest['vfsStatus'] {
+  switch (s) {
+    case 'completed':
+    case 'posted':
+      return 'completed';
+    case 'processing':
+      return 'processing';
+    case 'pending':
+      return 'pending';
+    default:
+      return 'none';
+  }
+}
+
+function mapCommitment(b: BackendInvoiceRequest): InvoiceRequest['commitment'] {
+  if (!b.commitment) return null;
+  const c = b.commitment;
+  const deadline = c.deadline ? formatDate(c.deadline) : '';
+  // Map backend kebab statuses to legacy UI buckets.
+  let status: NonNullable<InvoiceRequest['commitment']>['status'] = 'active';
+  if (c.status === 'expired' || c.status === 'overdue') status = 'overdue';
+  else if (c.status === 'pending') status = 'near-due';
+  return {
+    code: c.code,
+    status,
+    deadline,
+    daysRemaining: 0,
+    content: '',
+    createdBy: '',
+    createdDate: '',
+  };
+}
+
 function mapBackendRecord(b: BackendInvoiceRequest): InvoiceRequest {
+  // Backend now exposes request_code, before_vat, after_vat, invoice_no,
+  // s_invoice_status, vfs_status, commitment, creator. We map them properly.
+  const serviceTypeName =
+    typeof b.service_type === 'string'
+      ? b.service_type
+      : b.invoice_type?.name ?? '—';
+  const revenueCenterCode =
+    typeof b.revenue_center === 'string' ? b.revenue_center : '';
   return {
     id: b.id,
-    requestCode: b.code,
-    invoiceNo: '', // backend doesn't expose issued invoice number yet
+    requestCode: b.request_code,
+    invoiceNo: b.invoice_no ?? '',
     customer: b.customer?.name ?? '—',
     taxCode: b.customer?.tax_code ?? '',
-    serviceType: b.service_type?.name ?? b.invoice_type?.name ?? '—',
-    beforeVAT: toNumber(b.amount_before_vat),
+    serviceType: serviceTypeName,
+    beforeVAT: toNumber(b.before_vat),
     taxRate: b.tax_rate != null ? `${Number(b.tax_rate)}%` : '10%',
-    afterVAT: toNumber(b.amount_after_vat),
-    revenueCenter: b.revenue_center?.code ?? '',
+    afterVAT: toNumber(b.after_vat),
+    revenueCenter: revenueCenterCode,
     creator: b.creator?.name ?? '—',
-    department: b.revenue_center?.name ?? '',
+    department: revenueCenterCode,
     createdDate: formatDate(b.created_at),
     status: mapStatus(b.status),
     legalStatus: mapLegalStatus(b),
-    commitment: null,
-    sInvoiceStatus: 'none',
-    vfsStatus: 'none',
+    commitment: mapCommitment(b),
+    sInvoiceStatus: mapSInvoice(b.s_invoice_status),
+    sInvoiceCode: b.s_invoice_code ?? undefined,
+    sInvoiceError: b.s_invoice_error ?? undefined,
+    vfsStatus: mapVfs(b.vfs_status),
   };
 }
 

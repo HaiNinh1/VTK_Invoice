@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { FileText, Clock, AlertTriangle, CheckCircle, ArrowUpRight } from 'lucide-react';
 import { useMasterInvoiceData } from '../data/masterInvoiceData';
+import { useAuth } from '../../lib/auth/AuthProvider';
 
 interface DashboardEmployeeProps {
   getStatusBadge: (status: string) => ReactNode;
@@ -8,13 +9,24 @@ interface DashboardEmployeeProps {
 }
 
 export default function DashboardEmployee({ getStatusBadge, getLegalIcon }: DashboardEmployeeProps) {
-  const { MASTER_INVOICE_DATA, getMonthlyStats, getRecentRequests } = useMasterInvoiceData();
-  // Filter data for current employee (Nguyễn Văn A)
-  const myRecords = MASTER_INVOICE_DATA.filter(r => r.creator === 'Nguyễn Văn A');
+  const { MASTER_INVOICE_DATA, getMonthlyStats, getRecentRequests, isLoading, isError } = useMasterInvoiceData();
+  const { user: authUser } = useAuth();
+  const currentUserName = authUser?.name ?? '';
+  // Filter data for the signed-in employee
+  const myRecords = currentUserName
+    ? MASTER_INVOICE_DATA.filter(r => r.creator === currentUserName)
+    : [];
   const myPending = myRecords.filter(r => r.status === 'pending');
   const myIssued = myRecords.filter(r => r.status === 'issued' || r.status === 'accounted');
   const myIncompleteLegal = myRecords.filter(r => r.legalStatus.status !== 'complete');
   const myActiveCommitments = myRecords.filter(r => r.commitment !== null);
+
+  if (isLoading) {
+    return <div className="p-8 text-sm text-[#6B7280]">Đang tải dữ liệu…</div>;
+  }
+  if (isError) {
+    return <div className="p-8 text-sm text-[#DC2626]">Không tải được dữ liệu. Vui lòng thử lại.</div>;
+  }
 
   const formatCurrency = (value: number) => {
     if (value >= 1000000000) {

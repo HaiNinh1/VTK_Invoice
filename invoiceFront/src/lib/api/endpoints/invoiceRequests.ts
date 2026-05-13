@@ -37,6 +37,8 @@ function buildParams(p: ListInvoiceRequestsParams): Record<string, unknown> {
   return out;
 }
 
+// Backend StoreInvoiceRequestRequest requires `before_vat` + `after_vat` (NOT amount_before_vat).
+// Backend derives vat_amount from `tax_rate` — do NOT send it.
 export interface CreateInvoiceRequestPayload {
   customer_id: number;
   invoice_type_id: number;
@@ -44,11 +46,13 @@ export interface CreateInvoiceRequestPayload {
   contract_id?: number | null;
   payment_installment_id?: number | null;
   revenue_center_id?: number | null;
-  amount_before_vat: number;
-  tax_rate?: number;
-  vat_amount?: number;
-  amount_after_vat?: number;
-  notes?: string;
+  contract_number?: string | null;
+  contract_date?: string | null;
+  service_content?: string | null;
+  before_vat: number;
+  tax_rate: number;
+  after_vat: number;
+  notes?: string | null;
 }
 
 export const invoiceRequestsApi = {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
   FileText,
   Plus,
@@ -183,11 +184,11 @@ export default function ContractManagement({ onCreateInvoiceFromContract }: Cont
     }
     try {
       await createInvoiceMut.mutateAsync({ contractId, installmentId });
-      alert('Đã tạo đề nghị xuất hoá đơn từ đợt thanh toán.');
+      toast.success('Đã tạo đề nghị xuất hoá đơn từ đợt thanh toán.');
       setShowDetailModal(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Tạo đề nghị thất bại';
-      alert(msg);
+      toast.error(msg);
     }
   };
 

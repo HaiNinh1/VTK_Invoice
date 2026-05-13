@@ -45,34 +45,61 @@ export type InvoiceRequestStatus =
 
 export type LegalStatus = 'complete' | 'missing' | 'overdue' | 'in-progress';
 
+// InvoiceRequest — matches backend InvoiceRequestResource exactly.
+// See: invoiceBack/app/Http/Resources/InvoiceRequestResource.php
 export interface InvoiceRequest {
   id: number;
-  code: string;
+  request_code: string;
+  invoice_no: string | null;
   status: InvoiceRequestStatus;
-  customer_id: number | null;
-  customer?: { id: number; name: string; tax_code?: string | null } | null;
+
   invoice_type_id: number | null;
   invoice_type?: { id: number; code: string; name: string } | null;
-  service_type_id: number | null;
-  service_type?: { id: number; code: string; name: string } | null;
-  contract_id?: number | null;
-  payment_installment_id?: number | null;
+
+  customer_id?: number | null;
+  customer?: { id: number; name: string; tax_code?: string | null } | null;
+
+  // Backend returns these as STRINGS (service_type=name, revenue_center=code), not objects.
+  service_type?: string | null;
+  revenue_center?: string | null;
   revenue_center_id?: number | null;
-  revenue_center?: { id: number; code: string; name: string } | null;
-  department_id?: number | null;
-  created_by_id?: number | null;
+
+  contract_id?: number | null;
+  contract_number?: string | null;
+  contract_date?: string | null;
+  payment_installment_id?: number | null;
+  installment_id?: number | null;
+
   creator?: { id: number; name: string } | null;
+  creator_id: number | null;
   current_handler_id?: number | null;
-  current_handler?: { id: number; name: string } | null;
-  amount_before_vat: number | string;
-  vat_amount: number | string;
-  amount_after_vat: number | string;
-  tax_rate?: number | string;
-  legal_complete?: boolean;
-  legal_status_cache?: Record<string, unknown> | null;
-  notes?: string | null;
+  approved_by_id?: number | null;
+
+  // Backend returns these as decimal strings.
+  before_vat: number | string;
+  tax_rate: number | string;
+  after_vat: number | string;
+
+  legal_complete: boolean;
+  legal_status?: Record<string, unknown> | null;
+
+  commitment?: {
+    id: number;
+    code: string;
+    status: string;
+    deadline: string | null;
+    director_decision?: 'accepted' | 'rejected' | null;
+  } | null;
+
   return_reason?: string | null;
   rejection_reason?: string | null;
+
+  s_invoice_status?: 'pending' | 'pushing' | 'issued' | 'sent_to_cqt' | 'completed' | 'error' | null;
+  s_invoice_code?: string | null;
+  s_invoice_error?: string | null;
+  vfs_status?: 'pending' | 'processing' | 'posted' | 'completed' | 'error' | null;
+
+  notes?: string | null;
   created_at?: string;
   updated_at?: string;
 }

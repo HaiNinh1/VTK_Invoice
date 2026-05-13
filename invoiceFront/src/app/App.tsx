@@ -161,19 +161,26 @@ export default function App() {
   };
 
   // RBAC: Check if user has access to a page
+  const integrationsEnabled =
+    (import.meta.env.VITE_ENABLE_INTEGRATIONS as string | undefined)?.toLowerCase() === 'true';
+
   const hasAccess = (page: string): boolean => {
     const accessControl: Record<string, string[]> = {
       'dashboard': ['employee', 'manager', 'accountant', 'director', 'admin'],
       'invoices': ['employee', 'manager', 'accountant', 'director', 'admin'],
       'export-invoices': ['employee', 'manager', 'accountant', 'director', 'admin'],
       'contracts': ['employee', 'manager', 'accountant', 'director', 'admin'],
-      'invoice-types': ['director', 'admin'],
+      // Backend: invoice-types managed by admin only
+      'invoice-types': ['admin'],
       'approval': ['employee', 'manager', 'accountant', 'director', 'admin'],
       'legal': ['employee', 'manager', 'accountant', 'director', 'admin'],
-      'sinvoice': ['accountant', 'director', 'admin'],
-      'accounting': ['accountant', 'director', 'admin'],
-      'reports': ['manager', 'accountant', 'director', 'admin'],
-      'settings': ['director', 'admin'],
+      // S-Invoice + VFS integrations: hidden unless explicitly enabled via env flag
+      'sinvoice': integrationsEnabled ? ['accountant', 'director', 'admin'] : [],
+      'accounting': integrationsEnabled ? ['accountant', 'director', 'admin'] : [],
+      // Backend: report.view.company permission — only accountant+ has it
+      'reports': ['accountant', 'director', 'admin'],
+      // Backend: system settings are admin-only
+      'settings': ['admin'],
       'profile': ['employee', 'manager', 'accountant', 'director', 'admin'],
       'notifications': ['employee', 'manager', 'accountant', 'director', 'admin'],
       'screen-map': ['employee', 'manager', 'accountant', 'director', 'admin'],
@@ -192,7 +199,8 @@ export default function App() {
       setShowCreateInvoice(false);
       setCurrentRecordId(null);
     }
-  }, [userRole]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNav, userRole]);
 
   // Role configurations
   const roleConfig = {
@@ -231,54 +239,8 @@ export default function App() {
   // Responsive breakpoint simulation
   const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
 
-  // Invoice list data
-  const invoiceListData = [
-    { id: 'DN-2026-00156', invoiceNo: 'HD-001256', customer: 'Tập đoàn VNPT', serviceType: 'Tích hợp hệ thống', beforeVAT: '2.450.000.000', tax: '245.000.000', afterVAT: '2.695.000.000', revenueStatus: 'Đã xác nhận', creator: 'Nguyễn Văn A', date: '13/03/2026', status: 'pending', legal: 'complete' },
-    { id: 'DN-2026-00155', invoiceNo: 'HD-001255', customer: 'Viettel Construction JSC', serviceType: 'Tư vấn CNTT', beforeVAT: '5.820.000.000', tax: '582.000.000', afterVAT: '6.402.000.000', revenueStatus: 'Đã xác nhận', creator: 'Trần Thị B', date: '13/03/2026', status: 'approved', legal: 'complete' },
-    { id: 'DN-2026-00154', invoiceNo: 'HD-001254', customer: 'Công ty CP Bưu chính VN', serviceType: 'Dịch vụ Cloud', beforeVAT: '1.250.000.000', tax: '125.000.000', afterVAT: '1.375.000.000', revenueStatus: 'Chờ xác nhận', creator: 'Lê Văn C', date: '12/03/2026', status: 'issued', legal: 'missing' },
-    { id: 'DN-2026-00153', invoiceNo: '', customer: 'Viettel Telecom', serviceType: 'Bảo trì hệ thống', beforeVAT: '8.900.000.000', tax: '890.000.000', afterVAT: '9.790.000.000', revenueStatus: 'Đã xác nhận', creator: 'Phạm Thị D', date: '12/03/2026', status: 'approved', legal: 'complete' },
-    { id: 'DN-2026-00152', invoiceNo: 'HD-001252', customer: 'VNPT Vinaphone', serviceType: 'Tích hợp hệ thống', beforeVAT: '3.150.000.000', tax: '315.000.000', afterVAT: '3.465.000.000', revenueStatus: 'Đã xác nhận', creator: 'Hoàng Văn E', date: '11/03/2026', status: 'pending', legal: 'overdue' },
-    { id: 'DN-2026-00151', invoiceNo: 'HD-001251', customer: 'Viettel Global Investment', serviceType: 'Phát triển phần mềm', beforeVAT: '12.400.000.000', tax: '1.240.000.000', afterVAT: '13.640.000.000', revenueStatus: 'Đã xác nhận', creator: 'Đỗ Thị F', date: '11/03/2026', status: 'issued', legal: 'complete' },
-    { id: 'DN-2026-00150', invoiceNo: '', customer: 'Viettel High Tech', serviceType: 'Tư vấn CNTT', beforeVAT: '4.750.000.000', tax: '475.000.000', afterVAT: '5.225.000.000', revenueStatus: 'Chưa xác nhận', creator: 'Vũ Văn G', date: '10/03/2026', status: 'rejected', legal: 'missing' },
-    { id: 'DN-2026-00149', invoiceNo: 'HD-001249', customer: 'VNPT Technology', serviceType: 'Dịch vụ Cloud', beforeVAT: '6.200.000.000', tax: '620.000.000', afterVAT: '6.820.000.000', revenueStatus: 'Đã xác nhận', creator: 'Bùi Thị H', date: '10/03/2026', status: 'approved', legal: 'complete' },
-    { id: 'DN-2026-00148', invoiceNo: 'HD-001248', customer: 'Viettel Networks', serviceType: 'Bảo trì hệ thống', beforeVAT: '2.890.000.000', tax: '289.000.000', afterVAT: '3.179.000.000', revenueStatus: 'Đã xác nhận', creator: 'Ngô Văn I', date: '09/03/2026', status: 'issued', legal: 'complete' },
-    { id: 'DN-2026-00147', invoiceNo: 'HD-001247', customer: 'Tập đoàn Bưu chính VN', serviceType: 'Tích hợp hệ thống', beforeVAT: '7.650.000.000', tax: '765.000.000', afterVAT: '8.415.000.000', revenueStatus: 'Đã xác nhận', creator: 'Phan Thị J', date: '09/03/2026', status: 'pending', legal: 'complete' },
-    { id: 'DN-2026-00146', invoiceNo: '', customer: 'Viettel Aerospace', serviceType: 'Tư vấn CNTT', beforeVAT: '15.200.000.000', tax: '1.520.000.000', afterVAT: '16.720.000.000', revenueStatus: 'Chờ xác nhận', creator: 'Lý Văn K', date: '08/03/2026', status: 'draft', legal: 'missing' },
-    { id: 'DN-2026-00145', invoiceNo: 'HD-001245', customer: 'VNPT Hà Nội', serviceType: 'Dịch vụ Cloud', beforeVAT: '4.320.000.000', tax: '432.000.000', afterVAT: '4.752.000.000', revenueStatus: 'Đã xác nhận', creator: 'Đặng Thị L', date: '08/03/2026', status: 'approved', legal: 'complete' },
-    { id: 'DN-2026-00144', invoiceNo: 'HD-001244', customer: 'Viettel IDC', serviceType: 'Phát triển phần mềm', beforeVAT: '9.870.000.000', tax: '987.000.000', afterVAT: '10.857.000.000', revenueStatus: 'Đã xác nhận', creator: 'Trịnh Văn M', date: '07/03/2026', status: 'issued', legal: 'complete' },
-    { id: 'DN-2026-00143', invoiceNo: '', customer: 'VNPT VinaPhone South', serviceType: 'Bảo trì hệ thống', beforeVAT: '3.450.000.000', tax: '345.000.000', afterVAT: '3.795.000.000', revenueStatus: 'Chưa xác nhận', creator: 'Mai Thị N', date: '07/03/2026', status: 'rejected', legal: 'overdue' },
-    { id: 'DN-2026-00142', invoiceNo: 'HD-001242', customer: 'Viettel Solutions', serviceType: 'Tích hợp hệ thống', beforeVAT: '11.200.000.000', tax: '1.120.000.000', afterVAT: '12.320.000.000', revenueStatus: 'Đã xác nhận', creator: 'Hồ Văn O', date: '06/03/2026', status: 'issued', legal: 'complete' }
-  ];
-
-  // Chart data
-  const barChartData = [
-    { month: 'T8/2025', xuatHD: 35.2, dangXuLy: 8.5, choPheDuyet: 2.3, khac: 1.8 },
-    { month: 'T9/2025', xuatHD: 38.7, dangXuLy: 6.2, choPheDuyet: 3.1, khac: 2.0 },
-    { month: 'T10/2025', xuatHD: 42.1, dangXuLy: 7.8, choPheDuyet: 2.8, khac: 1.5 },
-    { month: 'T11/2025', xuatHD: 39.5, dangXuLy: 9.2, choPheDuyet: 3.5, khac: 2.2 },
-    { month: 'T12/2025', xuatHD: 44.8, dangXuLy: 6.9, choPheDuyet: 2.1, khac: 1.7 },
-    { month: 'T1/2026', xuatHD: 45.2, dangXuLy: 8.3, choPheDuyet: 2.9, khac: 1.9 }
-  ];
-
-  const donutChartData = [
-    { name: 'Đạt chuẩn', value: 62, color: '#16A34A' },
-    { name: 'Thiếu 1-2 HS', value: 15, color: '#D97706' },
-    { name: 'Đang xử lý', value: 13, color: '#94A3B8' },
-    { name: 'Quá hạn', value: 10, color: '#DC2626' }
-  ];
-
-  // Recent requests data for dashboard
-  const recentRequests = [
-    { id: 'DN-2026-00145', customer: 'VNPT Hà Nội', amount: '2.450.000.000', creator: 'Nguyễn Văn A', status: 'pending', legal: 'complete', date: '13/03/2026' },
-    { id: 'DN-2026-00144', customer: 'Viettel Construction', amount: '5.820.000.000', creator: 'Trần Thị B', status: 'approved', legal: 'complete', date: '13/03/2026' },
-    { id: 'DN-2026-00143', customer: 'Tập đoàn Bưu chính', amount: '1.250.000.000', creator: 'Lê Văn C', status: 'issued', legal: 'missing', date: '12/03/2026' },
-    { id: 'DN-2026-00142', customer: 'Viettel Telecom', amount: '8.900.000.000', creator: 'Phạm Thị D', status: 'approved', legal: 'complete', date: '12/03/2026' },
-    { id: 'DN-2026-00141', customer: 'VNPT Vinaphone', amount: '3.150.000.000', creator: 'Hoàng Văn E', status: 'pending', legal: 'overdue', date: '11/03/2026' },
-    { id: 'DN-2026-00140', customer: 'Viettel Global', amount: '12.400.000.000', creator: 'Đỗ Thị F', status: 'issued', legal: 'complete', date: '11/03/2026' },
-    { id: 'DN-2026-00139', customer: 'Viettel High Tech', amount: '4.750.000.000', creator: 'Vũ Văn G', status: 'rejected', legal: 'missing', date: '10/03/2026' },
-    { id: 'DN-2026-00138', customer: 'VNPT Technology', amount: '6.200.000.000', creator: 'Bùi Thị H', status: 'approved', legal: 'complete', date: '10/03/2026' }
-  ];
-
+  // (Removed obsolete demo arrays invoiceListData / barChartData / donutChartData / recentRequests.
+  //  All consumers now read from useMasterInvoiceData() / backend.)
   // Map backend notifications to the legacy shape consumed by NotificationDropdown
   const notifications = (notificationData?.data ?? []).map((n: any) => {
     const title =
@@ -304,9 +266,16 @@ export default function App() {
     };
   });
 
-  // Show onboarding screen if activeNav is 'onboarding'
-  if (activeNav === 'onboarding') {
+  // Show onboarding screen if activeNav is 'onboarding' or 'signature'
+  if (activeNav === 'onboarding' || activeNav === 'signature') {
     return <FirstTimeSignatureSetup />;
+  }
+
+  // Render-level RBAC guard: if user lacks access to the current page, fall back to dashboard.
+  // This is the authoritative check; nav visibility is just cosmetic.
+  if (!hasAccess(activeNav)) {
+    // useEffect above will redirect; render nothing this tick to avoid leaking content
+    return null;
   }
 
   return (
@@ -721,7 +690,7 @@ export default function App() {
                         </button>
                         <button
                           onClick={() => {
-                            setActiveNav('settings');
+                            setActiveNav('onboarding');
                             setUserDropdownOpen(false);
                           }}
                           className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[#374151] hover:bg-[#F9FAFB] rounded-lg transition-colors"

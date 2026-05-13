@@ -43,6 +43,12 @@ export class ApiError extends Error {
   isNetwork() {
     return this.status === 0;
   }
+  isNotFound() {
+    return this.status === 404;
+  }
+  isRateLimited() {
+    return this.status === 429;
+  }
 }
 
 /**
@@ -98,6 +104,26 @@ export function normalizeError(status: number, body: unknown): ApiError {
       raw: body,
     });
   }
+  // 404 not found
+  if (status === 404) {
+    return new ApiError({
+      status,
+      code: 'not_found',
+      message: (b.message as string) || 'Không tìm thấy tài nguyên.',
+      raw: body,
+    });
+  }
+
+  // 429 too many requests
+  if (status === 429) {
+    return new ApiError({
+      status,
+      code: 'rate_limited',
+      message: (b.message as string) || 'Quá nhiều yêu cầu. Vui lòng thử lại sau ít phút.',
+      raw: body,
+    });
+  }
+
 
   // 401 / 403
   if (status === 401) {

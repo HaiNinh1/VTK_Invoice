@@ -9,6 +9,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { useMasterInvoiceData } from '../data/masterInvoiceData';
+import { useAuth } from '../../lib/auth/AuthProvider';
 
 interface DashboardManagerProps {
   getStatusBadge: (status: string) => ReactNode;
@@ -16,16 +17,23 @@ interface DashboardManagerProps {
 }
 
 export default function DashboardManager({ getStatusBadge, getLegalIcon }: DashboardManagerProps) {
-  const { MASTER_INVOICE_DATA } = useMasterInvoiceData();
-  // Filter data for KV3 (TT Khu vực 3) department
-  const kv3Records = MASTER_INVOICE_DATA.filter(r => r.revenueCenter === 'KV3');
-  
-  // Calculate stats for KV3
-  const kv3ThisMonth = kv3Records.filter(r => {
-    // Simple month filter - in real app would check actual dates
-    return true; // For now, show all KV3 records as "this month"
-  });
-  
+  const { MASTER_INVOICE_DATA, isLoading, isError } = useMasterInvoiceData();
+  const { user: authUser } = useAuth();
+  const myCenter = authUser?.revenue_center?.code ?? '';
+  // Filter data for the manager's revenue center
+  const kv3Records = myCenter
+    ? MASTER_INVOICE_DATA.filter(r => r.revenueCenter === myCenter)
+    : MASTER_INVOICE_DATA;
+
+  if (isLoading) {
+    return <div className="p-8 text-sm text-[#6B7280]">Đang tải dữ liệu…</div>;
+  }
+  if (isError) {
+    return <div className="p-8 text-sm text-[#DC2626]">Không tải được dữ liệu. Vui lòng thử lại.</div>;
+  }
+
+  // Calculate stats for the center
+  const kv3ThisMonth = kv3Records.filter(_ => true); // placeholder for month filter
   const kv3Pending = kv3Records.filter(r => r.status === 'pending');
   const kv3IncompleteLegal = kv3Records.filter(r => r.legalStatus.status !== 'complete');
   const kv3Issued = kv3Records.filter(r => r.status === 'issued' || r.status === 'accounted');

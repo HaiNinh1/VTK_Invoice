@@ -16,40 +16,54 @@ export type CommitmentStatus =
   | 'rejected'
   | 'extended'
   | 'completed'
-  | 'expired';
+  | 'expired'
+  | 'overdue';
 
 export interface Commitment {
   id: number;
-  invoice_request_id: number;
-  document_type_id?: number | null;
-  document_type?: { id: number; code: string; name: string } | null;
-  reason?: string | null;
-  committed_at?: string | null;
-  due_date: string;
+  code: string;
+  invoice_request_id?: number;
+  content: string | null;
+  deadline: string | null;        // YYYY-MM-DD
   status: CommitmentStatus;
-  extensions_used?: number;
-  decided_at?: string | null;
-  decided_by_id?: number | null;
-  decided_by?: { id: number; name: string } | null;
-  decision_reason?: string | null;
+  signer_id?: number | null;
+  signed_at?: string | null;
+  missing_documents?: Array<Record<string, unknown>> | null;
+  director_id?: number | null;
+  director_decision?: 'accepted' | 'rejected' | null;
+  director_note?: string | null;
+  extensions?: {
+    count: number;
+    last?: Record<string, unknown> | null;
+  };
+  days_remaining?: number | null;
+  signature_snapshot_id?: number | null;
+  invoice_request?: {
+    id: number;
+    request_code: string;
+    status: string;
+    legal_complete: boolean;
+  } | null;
   created_at?: string;
   updated_at?: string;
 }
 
+// Backend: StoreCommitmentRequest requires `content` (string min 10) + `deadline` (date after today).
 export interface CreateCommitmentPayload {
-  document_type_id: number;
-  reason: string;
-  due_date: string; // YYYY-MM-DD
+  content: string;
+  deadline: string; // YYYY-MM-DD
 }
 
+// Backend: ExtendCommitmentRequest requires `days` (int 1-30) + `reason` (string min 10).
 export interface ExtendCommitmentPayload {
-  new_due_date: string;
+  days: number;
   reason: string;
 }
 
+// Backend: DecideCommitmentRequest requires `decision: accepted|rejected`; `note` required when rejected.
 export interface DecideCommitmentPayload {
-  decision: 'approved' | 'rejected';
-  reason?: string;
+  decision: 'accepted' | 'rejected';
+  note?: string;
 }
 
 export const commitmentsApi = {

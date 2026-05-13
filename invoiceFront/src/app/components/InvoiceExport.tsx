@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
   FileText, Download, Printer, Eye, X, Check, ChevronDown, FileSpreadsheet,
   Settings, Calendar, Filter, Search, CheckSquare, Square
@@ -83,22 +84,22 @@ export default function InvoiceExport({ userRole }: InvoiceExportProps) {
   // Handle export
   const handleExport = () => {
     if (selectedInvoices.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 hóa đơn để xuất');
+      toast.error('Vui lòng chọn ít nhất 1 hóa đơn để xuất');
       return;
     }
 
     // Simulate export
     const filename = `hoa-don-${exportFormat}-${new Date().toISOString().split('T')[0]}.${exportFormat === 'pdf' ? 'pdf' : 'xlsx'}`;
-    alert(`Đang xuất ${selectedInvoices.length} hóa đơn thành ${exportFormat.toUpperCase()}...\nTên file: ${filename}`);
+    toast.success(`Đang xuất ${selectedInvoices.length} hóa đơn thành ${exportFormat.toUpperCase()} — ${filename}`);
   };
 
   // Handle print
   const handlePrint = () => {
     if (selectedInvoices.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 hóa đơn để in');
+      toast.error('Vui lòng chọn ít nhất 1 hóa đơn để in');
       return;
     }
-    alert(`Đang in ${selectedInvoices.length} hóa đơn...`);
+    toast.success(`Đang in ${selectedInvoices.length} hóa đơn…`);
   };
 
   const statusOptions = [

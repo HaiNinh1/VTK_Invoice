@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
   AlertTriangle, ChevronDown, ChevronUp, Upload, Eye, CheckCircle,
   Clock, FileText, X, Calendar, User, Building2, FileCheck, Lock
@@ -536,7 +537,7 @@ export default function CommitmentTracking() {
               <Button
                 onClick={() => {
                   setShowUpdateModal(false);
-                  alert('Đã cập nhật cam kết thành công!');
+                  toast.success('Đã cập nhật cam kết thành công!');
                 }}
                 className="flex-1 h-10 bg-[#EE0033] text-white rounded-lg text-sm font-medium hover:bg-[#CC002B] flex items-center justify-center gap-2"
               >

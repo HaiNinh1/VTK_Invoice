@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -305,12 +306,12 @@ export default function CreateInvoiceRoleBased({
       setUploadProgress(null);
 
       if (uploadFailures.length > 0) {
-        alert(
+        toast.warning(
           'Đề nghị đã được tạo nhưng có lỗi khi tải hồ sơ:\n' +
             uploadFailures.join('\n')
         );
       } else {
-        alert('Tạo đề nghị xuất hoá đơn thành công.');
+        toast.success('Tạo đề nghị xuất hoá đơn thành công.');
       }
 
       if (newId != null && onSuccess) onSuccess(newId);
@@ -1000,7 +1001,7 @@ export default function CreateInvoiceRoleBased({
                       type="button"
                       onClick={() => {
                         if (!commitmentDeadline || commitmentReason.trim().length < 3) {
-                          alert('Vui lòng điền thời hạn và lý do cam kết (tối thiểu 3 ký tự).');
+                          toast.error('Vui lòng điền thời hạn và lý do cam kết (tối thiểu 3 ký tự).');
                           return;
                         }
                         setHasCommitment(true);

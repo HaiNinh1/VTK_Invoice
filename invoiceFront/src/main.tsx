@@ -5,6 +5,7 @@ import AppShell from './app/AppShell.tsx';
 import { AuthProvider } from './lib/auth/AuthProvider.tsx';
 import { QueryProvider } from './app/QueryProvider.tsx';
 import './styles/index.css';
+import { Toaster } from './app/components/ui/sonner.tsx';
 
 createRoot(document.getElementById('root')!).render(
   <BrowserRouter>
@@ -12,6 +13,7 @@ createRoot(document.getElementById('root')!).render(
       <QueryProvider>
         <AuthProvider>
           <AppShell />
+          <Toaster position="top-right" richColors closeButton />
         </AuthProvider>
       </QueryProvider>
     </ThemeProvider>

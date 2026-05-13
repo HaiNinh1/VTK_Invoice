@@ -23,8 +23,12 @@ export default function LoginPage() {
         if (err.isValidation() && err.fields) {
           setFieldErrors(err.fields);
           setError(err.message);
-        } else if (err.status === 401 || err.status === 422) {
+        } else if (err.status === 401) {
           setError('Email hoặc mật khẩu không đúng.');
+        } else if (err.isRateLimited()) {
+          setError('Quá nhiều lần thử. Vui lòng đợi vài phút rồi thử lại.');
+        } else if (err.isNetwork()) {
+          setError('Không thể kết nối tới máy chủ. Vui lòng kiểm tra mạng.');
         } else {
           setError(err.message);
         }

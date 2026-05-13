@@ -784,13 +784,17 @@ function LegalDocFormDialog({
 
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-2">Nhóm</label>
-            <input
-              type="text"
+            <select
               value={form.group}
               onChange={(e) => setForm({ ...form, group: e.target.value })}
-              placeholder="VD: Hợp đồng / Pháp lý / Thanh toán"
-              className="w-full h-10 px-3 border border-[#E5E7EB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033]"
-            />
+              className="w-full h-10 px-3 border border-[#E5E7EB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EE0033] bg-white"
+            >
+              <option value="">— Chọn nhóm —</option>
+              <option value="contract">Hợp đồng (contract)</option>
+              <option value="acceptance">Nghiệm thu (acceptance)</option>
+              <option value="settlement">Quyết toán (settlement)</option>
+              <option value="payment_guarantee">Thanh toán & Bảo lãnh (payment_guarantee)</option>
+            </select>
           </div>
 
           <div className="flex items-center gap-6">

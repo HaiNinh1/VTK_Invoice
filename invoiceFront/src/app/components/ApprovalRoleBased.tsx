@@ -15,6 +15,7 @@ import {
   useSignature,
 } from '../../lib/api/queries';
 import { ApiError } from '../../lib/api/errors';
+import { useAuth } from '../../lib/auth/AuthProvider';
 
 interface ApprovalRoleBasedProps {
   userRole: 'employee' | 'manager' | 'accountant' | 'director' | 'admin';
@@ -22,12 +23,15 @@ interface ApprovalRoleBasedProps {
 
 export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) {
   const { MASTER_INVOICE_DATA } = useMasterInvoiceData();
+  const { user: authUser } = useAuth();
+  const currentUserName = authUser?.name ?? '';
+  const currentRevenueCenter = authUser?.revenue_center?.code ?? '';
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected' | 'overview'>('pending');
   const [view, setView] = useState<'queue' | 'detail'>('queue');
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const [hasSignature] = useState(true); // legacy fallback; replaced below by real signature check
+  const [hasSignature] = useState(false); // legacy fallback; real check is hasRealSignature below
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [actionTargetId, setActionTargetId] = useState<string | number>('');
@@ -147,43 +151,59 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
   // Helper: all 11 items complete
   const ALL_COMPLETE: Record<string,string> = { L1:'complete',L2:'complete',L3:'complete',L4:'complete',L5:'complete',L6:'complete',L7:'complete',L8:'complete',L9:'complete',L10:'complete',L11:'complete' };
 
-  // Sample approval queue data
-  const allApprovalRequests = [
-    // Normal approvals — some with missing legal docs for KT to review
-    { id: 'DN-2026-00156', type: 'normal', customer: 'Tập đoàn VNPT', amount: '2.695.000.000', serviceType: 'Tích hợp hệ thống', creator: 'Nguyễn Văn A', revenueStatus: 'Đã xác nhận', date: '13/03/2026 14:30', legal: 'complete', status: 'pending', currentHandler: 'Lê Thị Kế toán', note: '',
-      legalDocs: { ...ALL_COMPLETE } },
-    { id: 'DN-2026-00155', type: 'normal', customer: 'Viettel Construction JSC', amount: '6.402.000.000', serviceType: 'Tư vấn CNTT', creator: 'Trần Thị B', revenueStatus: 'Đã xác nhận', date: '13/03/2026 10:15', legal: 'missing', status: 'pending', currentHandler: 'Nguyễn Văn KT', note: 'Thiếu HS nghiệm thu',
-      legalDocs: { ...ALL_COMPLETE, L5:'missing', L6:'missing' } },
-    { id: 'DN-2026-00153', type: 'normal', customer: 'Viettel Telecom', amount: '9.790.000.000', serviceType: 'Bảo trì hệ thống', creator: 'Phạm Thị D', revenueStatus: 'Đã xác nhận', date: '12/03/2026 16:45', legal: 'complete', status: 'approved', currentHandler: 'Trần Thị KT', note: '',
-      legalDocs: { ...ALL_COMPLETE } },
-    { id: 'DN-2026-00151', type: 'normal', customer: 'Viettel Global Investment', amount: '13.640.000.000', serviceType: 'Phát triển phần mềm', creator: 'Đỗ Thị F', revenueStatus: 'Đã xác nhận', date: '11/03/2026 09:20', legal: 'missing', status: 'pending', currentHandler: 'Lê Thị Kế toán', note: 'Thiếu HS quyết toán',
-      legalDocs: { ...ALL_COMPLETE, L7:'missing', L8:'missing', L9:'missing' } },
-    { id: 'DN-2026-00149', type: 'normal', customer: 'VNPT Technology', amount: '6.820.000.000', serviceType: 'Dịch vụ Cloud', creator: 'Bùi Thị H', revenueStatus: 'Đã xác nhận', date: '10/03/2026 11:30', legal: 'complete', status: 'approved', currentHandler: 'Nguyễn Văn KT', note: '',
-      legalDocs: { ...ALL_COMPLETE } },
-    { id: 'DN-2026-00148', type: 'normal', customer: 'Viettel Networks', amount: '3.179.000.000', serviceType: 'Bảo trì hệ thống', creator: 'Nguyễn Văn A', revenueStatus: 'Đã xác nhận', date: '09/03/2026 15:10', legal: 'complete', status: 'pending', currentHandler: 'Lê Thị Kế toán', note: '',
-      legalDocs: { ...ALL_COMPLETE } },
-    { id: 'DN-2026-00147', type: 'normal', customer: 'Tập đoàn Bưu chính VN', amount: '8.415.000.000', serviceType: 'Tích hợp hệ thống', creator: 'Phan Thị J', revenueStatus: 'Đã xác nhận', date: '09/03/2026 08:45', legal: 'complete', status: 'rejected', currentHandler: 'Trần Thị KT', note: 'Giá trị hợp đồng không khớp',
-      legalDocs: { ...ALL_COMPLETE } },
-    
-    // Special approvals with commitments (for Director)
-    { id: 'DN-2026-00154', type: 'special', customer: 'Công ty CP Bưu chính VN', amount: '1.375.000.000', serviceType: 'Dịch vụ Cloud', creator: 'Lê Văn C', revenueStatus: 'Chờ xác nhận', date: '12/03/2026 13:20', legal: 'missing', status: 'pending', currentHandler: 'Nguyễn Giám đốc', note: 'Đã cam kết bổ sung HS',
-      legalDocs: { ...ALL_COMPLETE, L4:'missing', L5:'missing' },
-      commitment: { deadline: '20/03/2026', content: 'Cam kết bổ sung Biên bản nghiệm thu và Báo cáo kết quả thực hiện trước ngày 20/03/2026', signer: 'Lê Văn C', signedDate: '12/03/2026 13:15' } },
-    { id: 'DN-2026-00152', type: 'special', customer: 'VNPT Vinaphone', amount: '3.465.000.000', serviceType: 'Tích hợp hệ thống', creator: 'Hoàng Văn E', revenueStatus: 'Đã xác nhận', date: '11/03/2026 14:50', legal: 'overdue', status: 'pending', currentHandler: 'Nguyễn Giám đốc', note: 'Có HS quá hạn, đã cam kết',
-      legalDocs: { ...ALL_COMPLETE, L5:'overdue', L9:'overdue' },
-      commitment: { deadline: '18/03/2026', content: 'Cam kết bổ sung Báo cáo kết quả thực hiện (đã quá hạn 5 ngày) và Xác nhận công nợ trước ngày 18/03/2026', signer: 'Hoàng Văn E', signedDate: '11/03/2026 14:45' } },
-    { id: 'DN-2026-00150', type: 'special', customer: 'Viettel High Tech', amount: '5.225.000.000', serviceType: 'Tư vấn CNTT', creator: 'Vũ Văn G', revenueStatus: 'Chưa xác nhận', date: '10/03/2026 10:30', legal: 'missing', status: 'approved', currentHandler: 'Nguyễn Giám đốc', note: 'Đã duyệt với cam kết',
-      legalDocs: { ...ALL_COMPLETE, L3:'missing', L10:'missing', L11:'missing' },
-      commitment: { deadline: '25/03/2026', content: 'Cam kết bổ sung Biên bản thỏa thuận giá, Chứng từ thanh toán, và Xác nhận thanh toán trước ngày 25/03/2026', signer: 'Vũ Văn G', signedDate: '10/03/2026 10:25' } },
-
-    // Personal employee data (Nguyễn Văn A)
-    { id: 'DN-2026-00145', type: 'normal', customer: 'VNPT Hà Nội', amount: '4.752.000.000', serviceType: 'Dịch vụ Cloud', creator: 'Nguyễn Văn A', revenueStatus: 'Đã xác nhận', date: '08/03/2026 10:20', legal: 'complete', status: 'approved', currentHandler: 'Lê Thị Kế toán', note: '',
-      legalDocs: { ...ALL_COMPLETE } },
-    { id: 'DN-2026-00138', type: 'normal', customer: 'Công ty TNHH ABC', amount: '3.520.000.000', serviceType: 'Tích hợp hệ thống', creator: 'Nguyễn Văn A', revenueStatus: 'Đã xác nhận', date: '05/03/2026 09:15', legal: 'complete', status: 'approved', currentHandler: 'Nguyễn Văn KT', note: '',
-      legalDocs: { ...ALL_COMPLETE } },
-    { id: 'DN-2026-00135', type: 'normal', customer: 'VNPT Digital', amount: '4.510.000.000', serviceType: 'Tư vấn CNTT', creator: 'Nguyễn Văn A', revenueStatus: 'Đã xác nhận', date: '03/03/2026 14:30', legal: 'complete', status: 'pending', currentHandler: 'Lê Thị Kế toán', note: '',
-      legalDocs: { ...ALL_COMPLETE } },
-  ];
+  // Adapted approval queue: derived from MASTER_INVOICE_DATA (real backend records)
+  // so action handlers receive REAL numeric backend IDs, not demo DN-* codes.
+  const allApprovalRequests = MASTER_INVOICE_DATA
+    .filter(r => ['pending', 'pending-vpgd', 'approved', 'rejected', 'returned'].includes(r.status))
+    .map(r => {
+      const isSpecial = !!r.commitment;
+      const legal: 'complete' | 'missing' | 'overdue' =
+        r.legalStatus.status === 'complete'
+          ? 'complete'
+          : r.legalStatus.status === 'overdue'
+            ? 'overdue'
+            : 'missing';
+      const status =
+        r.status === 'pending-vpgd' ? 'pending' :
+        r.status === 'returned' ? 'pending' :
+        r.status; // 'pending' | 'approved' | 'rejected'
+      const docs: Record<string, string> = { ...ALL_COMPLETE };
+      if (legal !== 'complete') {
+        // Mark some doc slots as missing/overdue so UI counters render meaningfully.
+        docs.L5 = legal === 'overdue' ? 'overdue' : 'missing';
+        docs.L6 = legal === 'overdue' ? 'overdue' : 'missing';
+      }
+      return {
+        id: r.requestCode,           // display code (DN-*), used as React key
+        backendId: r.id,             // REAL numeric id for API calls
+        type: (isSpecial ? 'special' : 'normal') as 'special' | 'normal',
+        customer: r.customer,
+        amount: (typeof r.afterVAT === 'number' ? r.afterVAT : Number(r.afterVAT) || 0)
+          .toLocaleString('vi-VN'),
+        serviceType: r.serviceType,
+        creator: r.creator,
+        revenueStatus: status === 'approved' ? 'Đã xác nhận' : 'Chờ xác nhận',
+        date: r.createdDate,
+        legal,
+        status,
+        currentHandler:
+          r.status === 'pending' ? 'Kế toán' :
+          r.status === 'pending-vpgd' ? 'Giám đốc' :
+          r.status === 'approved' ? 'Đã duyệt' :
+          r.status === 'rejected' ? 'Từ chối' :
+          r.status === 'returned' ? 'Trả lại' : '—',
+        note: isSpecial ? 'Có cam kết bổ sung' : legal !== 'complete' ? 'Thiếu hồ sơ pháp lý' : '',
+        legalDocs: docs,
+        commitment: r.commitment
+          ? {
+              deadline: r.commitment.deadline,
+              content: r.commitment.content,
+              signer: r.commitment.createdBy,
+              signedDate: r.commitment.createdDate,
+            }
+          : undefined,
+      };
+    });
 
   // Helper to count missing/overdue docs
   const getLegalDocStats = (legalDocs: Record<string, string>) => {
@@ -198,12 +218,12 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
   const getFilteredRequests = () => {
     if (userRole === 'employee') {
       // Employee: Only their own requests in approval pipeline
-      return allApprovalRequests.filter(r => r.creator === 'Nguyễn Văn A' && r.status !== 'draft');
+      return allApprovalRequests.filter(r => r.creator === currentUserName && r.status !== 'draft');
     } else if (userRole === 'manager') {
-      // Manager: Department tracking view - all requests from KV3 in approval pipeline
+      // Manager: Department tracking view — all requests from their revenue center
       return MASTER_INVOICE_DATA
-        .filter(r => 
-          r.revenueCenter === 'KV3' && 
+        .filter(r =>
+          (!currentRevenueCenter || r.revenueCenter === currentRevenueCenter) &&
           ['pending', 'pending-vpgd', 'approved', 'rejected'].includes(r.status)
         )
         .map(r => ({
@@ -762,7 +782,7 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
                               disabled={!hasSignature}
                               className="h-8 px-3 bg-[#16A34A] text-white text-xs font-medium rounded-lg hover:bg-[#15803D] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                               onClick={() => {
-                                setActionTargetId(request.id);
+                                setActionTargetId((request as any).backendId ?? request.id);
                                 setShowApproveModal(true);
                               }}
                             >
@@ -775,7 +795,7 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
                               disabled={!hasSignature}
                               className="h-8 px-3 bg-[#D97706] text-white text-xs font-medium rounded-lg hover:bg-[#B45309] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                               onClick={() => {
-                                setActionTargetId(request.id);
+                                setActionTargetId((request as any).backendId ?? request.id);
                                 setCommitmentAcknowledged(false);
                                 setRiskAcknowledged(false);
                                 setShowCommitmentApproveModal(true);
@@ -802,7 +822,7 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
                           <button 
                             className="h-8 px-3 bg-white text-[#DC2626] border border-[#DC2626] text-xs font-medium rounded-lg hover:bg-[#FEE2E2] flex items-center gap-1.5"
                             onClick={() => {
-                              setActionTargetId(request.id);
+                              setActionTargetId((request as any).backendId ?? request.id);
                               setShowRejectModal(true);
                             }}
                           >
@@ -937,7 +957,7 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
           <div className="p-6 overflow-y-auto max-h-[60vh] space-y-4">
             {/* Legal Status Warning Banner */}
             {(() => {
-              const targetReq = allApprovalRequests.find(r => r.id === actionTargetId);
+              const targetReq = allApprovalRequests.find(r => r.backendId === actionTargetId);
               const isOverdue = targetReq?.legal === 'overdue';
               return (
                 <div className={`rounded-lg p-3 flex items-start gap-2.5 ${isOverdue ? 'bg-[#FEE2E2] border border-[#FCA5A5]' : 'bg-[#FEF3C7] border border-[#FCD34D]'}`}>
@@ -958,7 +978,7 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
 
             {/* Request Summary */}
             {(() => {
-              const targetReq = allApprovalRequests.find(r => r.id === actionTargetId);
+              const targetReq = allApprovalRequests.find(r => r.backendId === actionTargetId);
               if (!targetReq) return null;
               return (
                 <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg p-4">
@@ -987,7 +1007,7 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
 
             {/* Commitment Details */}
             {(() => {
-              const targetReq = allApprovalRequests.find(r => r.id === actionTargetId) as any;
+              const targetReq = allApprovalRequests.find(r => r.backendId === actionTargetId) as any;
               if (!targetReq?.commitment) return null;
               return (
                 <div className="bg-white border-2 border-[#D97706] rounded-lg p-4">
@@ -1019,7 +1039,7 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
 
             {/* Missing Documents List */}
             {(() => {
-              const targetReq = allApprovalRequests.find(r => r.id === actionTargetId);
+              const targetReq = allApprovalRequests.find(r => r.backendId === actionTargetId);
               if (!targetReq) return null;
               
               // Get all missing/overdue items grouped
@@ -1071,7 +1091,7 @@ export default function ApprovalRoleBased({ userRole }: ApprovalRoleBasedProps) 
 
             {/* Risk Level Indicator */}
             {(() => {
-              const targetReq = allApprovalRequests.find(r => r.id === actionTargetId);
+              const targetReq = allApprovalRequests.find(r => r.backendId === actionTargetId);
               const isOverdue = targetReq?.legal === 'overdue';
               return (
                 <div className="flex items-center gap-3 p-3 bg-[#F9FAFB] rounded-lg border border-[#E5E7EB]">
