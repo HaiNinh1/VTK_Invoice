@@ -57,13 +57,13 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] bg-white rounded-xl shadow-xl border border-gray-200 p-0 w-[95vw] max-h-[90vh] overflow-hidden md:w-auto md:max-w-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200",
+          "fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] bg-card text-card-foreground rounded-lg shadow-xl border border-border p-0 w-[95vw] max-h-[90vh] overflow-hidden md:w-auto md:max-w-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200",
           className,
         )}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1 hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-300">
+        <DialogPrimitive.Close className="absolute right-3 top-3 rounded-md p-1 hover:bg-muted text-muted-foreground hover:text-foreground transition focus:outline-none focus:ring-2 focus:ring-ring/40">
           <XIcon className="size-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
@@ -76,7 +76,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("p-6 pb-0", className)}
+      className={cn("p-5 pb-0", className)}
       {...props}
     />
   );
@@ -87,7 +87,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "p-6 pt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 border-t border-gray-100",
+        "p-5 pt-3 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 border-t border-border",
         className,
       )}
       {...props}
@@ -102,7 +102,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg font-semibold text-gray-900", className)}
+      className={cn("text-base font-semibold text-foreground", className)}
       {...props}
     />
   );
@@ -115,7 +115,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-sm text-gray-500 mt-1", className)}
+      className={cn("text-sm text-muted-foreground mt-1", className)}
       {...props}
     />
   );

@@ -286,11 +286,11 @@ export default function App() {
           {/* LEFT SIDEBAR */}
           <aside 
             className={`hidden md:flex bg-white border-r border-[#E5E7EB] flex-col transition-all duration-300 ${
-              viewport === 'tablet' || !sidebarExpanded ? 'w-16' : 'w-[260px]'
+              viewport === 'tablet' || !sidebarExpanded ? 'w-14' : 'w-[232px]'
             }`}
           >
             {/* LOGO SECTION */}
-            <div className="h-20 border-b border-[#E5E7EB] flex items-center px-6">
+            <div className="h-14 border-b border-[#E5E7EB] flex items-center px-4">
               {(viewport === 'desktop' && sidebarExpanded) ? (
                 <div>
                   <div className="flex items-center gap-2">
@@ -309,31 +309,31 @@ export default function App() {
             </div>
 
             {/* NAVIGATION */}
-            <nav className="flex-1 overflow-y-auto py-4 px-3">
+            <nav className="flex-1 overflow-y-auto py-3 px-2">
               <div className="space-y-1">
                 {/* Tổng quan */}
                 <button
                   onClick={() => setActiveNav('dashboard')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'dashboard'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <LayoutDashboard size={20} className={activeNav === 'dashboard' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <LayoutDashboard size={18} className={activeNav === 'dashboard' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && <span>Tổng quan</span>}
                 </button>
 
                 {/* Đề nghị xuất HĐ */}
                 <button
                   onClick={() => setActiveNav('invoices')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'invoices'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <FileText size={20} className={activeNav === 'invoices' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <FileText size={18} className={activeNav === 'invoices' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && (
                     <>
                       <span className="flex-1 text-left">Đề nghị xuất HĐ</span>
@@ -345,26 +345,26 @@ export default function App() {
                 {/* Xuất hóa đơn */}
                 <button
                   onClick={() => setActiveNav('export-invoices')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'export-invoices'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <Download size={20} className={activeNav === 'export-invoices' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <Download size={18} className={activeNav === 'export-invoices' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && <span>Xuất hóa đơn</span>}
                 </button>
 
                 {/* Quản lý Hợp đồng */}
                 <button
                   onClick={() => setActiveNav('contracts')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'contracts'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <FileSignature size={20} className={activeNav === 'contracts' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <FileSignature size={18} className={activeNav === 'contracts' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && <span>Quản lý Hợp đồng</span>}
                 </button>
 
@@ -372,13 +372,13 @@ export default function App() {
                 {hasAccess('legal') && (
                 <button
                   onClick={() => setActiveNav('legal')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'legal'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <ShieldCheck size={20} className={activeNav === 'legal' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <ShieldCheck size={18} className={activeNav === 'legal' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && <span>{userRole === 'employee' ? 'Hồ sơ pháp lý của tôi' : 'Quản lý pháp lý'}</span>}
                 </button>
                 )}
@@ -387,13 +387,13 @@ export default function App() {
                 {(userRole === 'accountant' || userRole === 'director' || userRole === 'admin') && (
                   <button
                     onClick={() => setActiveNav('approval')}
-                    className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                    className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                       activeNav === 'approval'
-                        ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                        ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                         : 'text-[#374151] hover:bg-[#F3F4F6]'
                     }`}
                   >
-                    <CheckSquare size={20} className={activeNav === 'approval' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                    <CheckSquare size={18} className={activeNav === 'approval' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                     {(viewport === 'desktop' && sidebarExpanded) && (
                       <>
                         <span className="flex-1 text-left">Phê duyệt</span>
@@ -407,13 +407,13 @@ export default function App() {
                 {userRole === 'manager' && (
                   <button
                     onClick={() => setActiveNav('approval')}
-                    className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                    className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                       activeNav === 'approval'
-                        ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                        ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                         : 'text-[#374151] hover:bg-[#F3F4F6]'
                     }`}
                   >
-                    <Eye size={20} className={activeNav === 'approval' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                    <Eye size={18} className={activeNav === 'approval' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                     {(viewport === 'desktop' && sidebarExpanded) && (
                       <span className="flex-1 text-left">Theo dõi duyệt phòng ban</span>
                     )}
@@ -424,13 +424,13 @@ export default function App() {
                 {userRole === 'employee' && (
                   <button
                     onClick={() => setActiveNav('approval')}
-                    className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                    className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                       activeNav === 'approval'
-                        ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                        ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                         : 'text-[#374151] hover:bg-[#F3F4F6]'
                     }`}
                   >
-                    <Eye size={20} className={activeNav === 'approval' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                    <Eye size={18} className={activeNav === 'approval' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                     {(viewport === 'desktop' && sidebarExpanded) && (
                       <span className="flex-1 text-left">Theo dõi duyệt</span>
                     )}
@@ -441,13 +441,13 @@ export default function App() {
                 {hasAccess('sinvoice') && (
                 <button
                   onClick={() => setActiveNav('sinvoice')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'sinvoice'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <Zap size={20} className={activeNav === 'sinvoice' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <Zap size={18} className={activeNav === 'sinvoice' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && <span>S-Invoice</span>}
                 </button>
                 )}
@@ -456,13 +456,13 @@ export default function App() {
                 {hasAccess('accounting') && (
                 <button
                   onClick={() => setActiveNav('accounting')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'accounting'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <Database size={20} className={activeNav === 'accounting' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <Database size={18} className={activeNav === 'accounting' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && <span>Hạch toán VFS</span>}
                 </button>
                 )}
@@ -471,13 +471,13 @@ export default function App() {
                 {hasAccess('reports') && (
                 <button
                   onClick={() => setActiveNav('reports')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'reports'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <BarChart3 size={20} className={activeNav === 'reports' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <BarChart3 size={18} className={activeNav === 'reports' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && <span>Báo cáo</span>}
                 </button>
                 )}
@@ -489,13 +489,13 @@ export default function App() {
                 {hasAccess('invoice-types') && (
                 <button
                   onClick={() => setActiveNav('invoice-types')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'invoice-types'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <Layers size={20} className={activeNav === 'invoice-types' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <Layers size={18} className={activeNav === 'invoice-types' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && <span>Quản lý Loại HĐ</span>}
                 </button>
                 )}
@@ -504,13 +504,13 @@ export default function App() {
                 {hasAccess('settings') && (
                 <button
                   onClick={() => setActiveNav('settings')}
-                  className={`w-full h-12 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-sm font-medium transition-all ${
                     activeNav === 'settings'
-                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-3 border-[#EE0033]'
+                      ? 'bg-[#FFF1F3] text-[#EE0033] border-l-2 border-[#EE0033]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`}
                 >
-                  <SettingsIcon size={20} className={activeNav === 'settings' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
+                  <SettingsIcon size={18} className={activeNav === 'settings' ? 'text-[#EE0033]' : 'text-[#6B7280]'} />
                   {(viewport === 'desktop' && sidebarExpanded) && <span>Cài đặt</span>}
                 </button>
                 )}
@@ -521,10 +521,10 @@ export default function App() {
             {(viewport === 'desktop' && sidebarExpanded) ? (
               <button 
                 onClick={() => setActiveNav('profile')}
-                className="border-t border-[#E5E7EB] p-4 hover:bg-[#F9FAFB] transition-colors w-full text-left"
+                className="border-t border-[#E5E7EB] p-3 hover:bg-[#F9FAFB] transition-colors w-full text-left"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#D1D5DB] flex items-center justify-center text-[#374151] text-sm font-medium flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-[#D1D5DB] flex items-center justify-center text-[#374151] text-sm font-medium flex-shrink-0">
                     {(currentUser.name || '?').trim().split(/\s+/).slice(-2).map(s => s[0]).join('').toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -547,7 +547,7 @@ export default function App() {
                 onClick={() => setActiveNav('profile')}
                 className="border-t border-[#E5E7EB] p-2 flex justify-center hover:bg-[#F9FAFB] transition-colors w-full"
               >
-                <div className="w-9 h-9 rounded-full bg-[#D1D5DB] flex items-center justify-center text-[#374151] text-sm font-medium">
+                <div className="w-8 h-8 rounded-full bg-[#D1D5DB] flex items-center justify-center text-[#374151] text-sm font-medium">
                   NV
                 </div>
               </button>
@@ -570,15 +570,15 @@ export default function App() {
           {/* MAIN CONTENT AREA */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* TOP HEADER */}
-            <header className="h-16 bg-white border-b border-[#E5E7EB] flex items-center justify-between px-6">
+            <header className="h-12 bg-white border-b border-[#E5E7EB] flex items-center justify-between px-5">
               {/* Left: Breadcrumb */}
               <div className="flex items-center gap-3">
                 {viewport === 'tablet' && (
                   <button 
                     onClick={() => setSidebarExpanded(!sidebarExpanded)}
-                    className="p-2 hover:bg-[#F3F4F6] rounded-lg"
+                    className="p-1.5 hover:bg-[#F3F4F6] rounded-md"
                   >
-                    <Menu size={20} className="text-[#6B7280]" />
+                    <Menu size={18} className="text-[#6B7280]" />
                   </button>
                 )}
                 <div className="hidden md:flex items-center gap-2 text-sm">
@@ -610,7 +610,7 @@ export default function App() {
               </div>
 
               {/* Right: Actions */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 {/* Data Scope Indicator */}
                 <div className="hidden md:flex text-xs text-[#9CA3AF] items-center gap-1.5">
                   <Database size={14} className="text-[#9CA3AF]" />
@@ -620,13 +620,13 @@ export default function App() {
                 {/* Theme Toggle */}
                 <button 
                   onClick={() => setTheme(darkMode ? 'light' : 'dark')}
-                  className="hidden md:block p-2 hover:bg-[#F3F4F6] rounded-lg transition-all duration-200"
+                  className="hidden md:block p-1.5 hover:bg-[#F3F4F6] rounded-md transition-all duration-200"
                   title={darkMode ? "Chế độ sáng" : "Chế độ tối"}
                 >
                   {darkMode ? (
-                    <Sun size={20} className="text-[#6B7280] transition-all duration-200" />
+                    <Sun size={18} className="text-[#6B7280] transition-all duration-200" />
                   ) : (
-                    <Moon size={20} className="text-[#6B7280] transition-all duration-200" />
+                    <Moon size={18} className="text-[#6B7280] transition-all duration-200" />
                   )}
                 </button>
 
@@ -634,9 +634,9 @@ export default function App() {
                 <div className="relative">
                   <button 
                     onClick={() => setNotificationOpen(!notificationOpen)}
-                    className="p-2 hover:bg-[#F3F4F6] rounded-lg relative transition-colors"
+                    className="p-1.5 hover:bg-[#F3F4F6] rounded-md relative transition-colors"
                   >
-                    <Bell size={20} className="text-[#6B7280]" />
+                    <Bell size={18} className="text-[#6B7280]" />
                     {unreadNotificationCount > 0 && (
                       <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-[#EE0033] text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
                         {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
@@ -655,7 +655,7 @@ export default function App() {
                 <div className="relative">
                   <button 
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="hidden md:flex items-center gap-2 hover:bg-[#F3F4F6] rounded-lg px-2 py-1.5 transition-colors"
+                    className="hidden md:flex items-center gap-1.5 hover:bg-[#F3F4F6] rounded-md px-2 py-1.5 transition-colors"
                   >
                     <div className="w-8 h-8 rounded-full bg-[#D1D5DB] flex items-center justify-center text-[#374151] text-xs font-medium">
                       {(currentUser.name || '?').trim().split(/\s+/).slice(-2).map(s => s[0]).join('').toUpperCase()}
@@ -725,7 +725,7 @@ export default function App() {
                 </div>
 
                 {/* Viewport Switcher (Demo) */}
-                <div className="ml-4 flex gap-1 border-l pl-4 border-[#E5E7EB]">
+                <div className="ml-2 flex gap-1 border-l pl-3 border-[#E5E7EB]">
                   <button
                     onClick={() => setViewport('desktop')}
                     className={`px-2 py-1 text-xs rounded ${viewport === 'desktop' ? 'bg-[#EE0033] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}
@@ -748,7 +748,7 @@ export default function App() {
 
                 {/* Role Switcher (Demo) — gated by VITE_ENABLE_DEMO_ROLE_SWITCHER */}
                 {SHOW_DEMO_ROLE_SWITCHER && (
-                <div className="ml-4 flex gap-1 border-l pl-4 border-[#E5E7EB]">
+                <div className="ml-2 flex gap-1 border-l pl-3 border-[#E5E7EB]">
                   <button
                     onClick={() => setUserRole('employee')}
                     className={`px-2 py-1 text-xs rounded ${userRole === 'employee' ? 'bg-[#4B5563] text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}
@@ -788,7 +788,7 @@ export default function App() {
                 )}
 
                 {/* Demo: Show Signature Setup */}
-                <div className="ml-4 border-l pl-4 border-[#E5E7EB]">
+                <div className="ml-2 border-l pl-3 border-[#E5E7EB]">
                   <button
                     onClick={() => setActiveNav('onboarding')}
                     className="px-3 py-1.5 text-xs rounded bg-[#16A34A] text-white hover:bg-[#15803D] font-medium"
@@ -801,7 +801,7 @@ export default function App() {
             </header>
 
             {/* MAIN CONTENT */}
-            <main className={`flex-1 bg-[#F9FAFB] p-6 ${activeNav === 'settings' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
+            <main className={`flex-1 bg-[#F9FAFB] p-5 ${activeNav === 'settings' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
               <div className={`max-w-[1440px] ${activeNav === 'settings' ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
                 {/* INVOICE LIST VIEW */}
                 {activeNav === 'invoices' && (
@@ -938,7 +938,7 @@ export default function App() {
               <span className="font-semibold text-[#111827] text-sm">VTK</span>
             </div>
             <button className="relative" onClick={() => { setActiveNav('notifications'); setMobileMenuOpen(false); }}>
-              <Bell size={20} className="text-[#6B7280]" />
+              <Bell size={18} className="text-[#6B7280]" />
               {unreadNotificationCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#EE0033] text-white text-[9px] font-semibold rounded-full flex items-center justify-center">
                   {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
