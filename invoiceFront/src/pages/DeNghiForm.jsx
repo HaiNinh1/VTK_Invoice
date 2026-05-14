@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Save, Send, CheckCircle2, Circle } from 'lucide-react'
+import { ArrowLeft, Save, Send, CheckCircle2, Circle, Undo2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,13 +9,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND } from '@/components/shared/formatters'
 import {
-  CONTRACTS,
   INVOICE_REQUESTS,
   getChecklistForServiceType,
 } from '@/data/masterData'
+import { useContracts } from '@/context/ContractsContext'
+import { useRole } from '@/context/RoleContext'
 import { useToast } from '@/components/ui/toast'
 
 /* -----------------------------------------------------------------------
@@ -34,6 +36,8 @@ export default function DeNghiForm() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { contracts } = useContracts()
+  const { user } = useRole()
   const existing = id && id !== 'moi'
     ? INVOICE_REQUESTS.find(r => r.id === id)
     : null
@@ -48,10 +52,12 @@ export default function DeNghiForm() {
   const [checked, setChecked] = useState(() => new Set())
   const [commitment, setCommitment] = useState('')
   const [tab, setTab] = useState('thong-tin')
+  const [confirmRecall, setConfirmRecall] = useState(false)
+  const [recalled, setRecalled] = useState(false)
 
   const contract = useMemo(
-    () => CONTRACTS.find(c => c.id === contractId),
-    [CONTRACTS, contractId],
+    () => contracts.find(c => c.id === contractId),
+    [contracts, contractId],
   )
   const checklist = useMemo(
     () => contract ? getChecklistForServiceType(contract.serviceType) : [],
@@ -63,7 +69,9 @@ export default function DeNghiForm() {
   )
   const vatAmount    = Math.round((Number(valueBeforeVAT) || 0) * vatRate / 100)
   const valueAfterVAT = (Number(valueBeforeVAT) || 0) + vatAmount
-  const readOnly = !!existing && existing.status !== 'Nháp' && existing.status !== 'Trả lại bổ sung'
+  const effectiveStatus = recalled ? 'Nháp' : existing?.status
+  const readOnly = !!existing && effectiveStatus !== 'Nháp' && effectiveStatus !== 'Trả lại bổ sung'
+  const canRecall = !!existing && effectiveStatus === 'Chờ duyệt' && existing.createdById === user.id
 
   function toggleDoc(docId) {
     if (readOnly) return
@@ -95,14 +103,23 @@ export default function DeNghiForm() {
             </h1>
             {existing && (
               <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                <StatusBadge status={existing.status} />
+                <StatusBadge status={effectiveStatus} />
                 <span>· Tạo bởi {existing.createdBy}</span>
               </div>
             )}
           </div>
         </div>
         {!readOnly && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {canRecall && (
+              <Button
+                variant="outline"
+                onClick={() => setConfirmRecall(true)}
+                className="text-amber-700 hover:bg-amber-50"
+              >
+                <Undo2 className="h-4 w-4" /> Thu hồi
+              </Button>
+            )}
             <Button variant="outline" onClick={() => toast.success('Đã lưu nháp (demo)')}>
               <Save className="h-4 w-4" /> Lưu nháp
             </Button>
@@ -112,6 +129,17 @@ export default function DeNghiForm() {
           </div>
         )}
       </div>
+
+      {canRecall && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="flex items-start gap-2">
+            <Undo2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <div className="flex-1">
+              Đề nghị đang ở trạng thái <strong>Chờ duyệt</strong>. Bạn có thể thu hồi để chỉnh sửa lại trước khi kế toán xử lý.
+            </div>
+          </div>
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">
@@ -130,7 +158,7 @@ export default function DeNghiForm() {
                 <Select value={contractId} onValueChange={setContractId} disabled={readOnly}>
                   <SelectTrigger><SelectValue placeholder="Chọn hợp đồng..." /></SelectTrigger>
                   <SelectContent>
-                    {CONTRACTS.map(c => (
+                    {contracts.map(c => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.contractNumber} — {c.customerName}
                       </SelectItem>
@@ -281,6 +309,21 @@ export default function DeNghiForm() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ConfirmModal
+        open={confirmRecall}
+        onOpenChange={setConfirmRecall}
+        title="Thu hồi đề nghị?"
+        description={existing
+          ? `Đề nghị ${existing.id} sẽ được chuyển về trạng thái Nháp để bạn chỉnh sửa lại.`
+          : ''}
+        confirmLabel="Thu hồi"
+        confirmVariant="destructive"
+        onConfirm={() => {
+          setRecalled(true)
+          toast.success('Đã thu hồi đề nghị — chuyển về trạng thái Nháp')
+        }}
+      />
     </div>
   )
 }

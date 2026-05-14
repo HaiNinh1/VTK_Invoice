@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Download } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -71,11 +71,16 @@ export default function HopDong() {
           </Select>
         </div>
 
-        <Button asChild>
-          <Link to="/hop-dong/moi">
-            <Plus className="h-4 w-4" /> Thêm hợp đồng mới
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => exportContractsCSV(rows)}>
+            <Download className="h-4 w-4" /> Xuất Excel
+          </Button>
+          <Button asChild>
+            <Link to="/hop-dong/moi">
+              <Plus className="h-4 w-4" /> Thêm hợp đồng mới
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Result count */}
@@ -196,4 +201,35 @@ function ContractCard({ c }) {
       </Card>
     </Link>
   )
+}
+
+
+/* ----- Xuất Excel (CSV UTF-8 BOM để Excel mở đúng tiếng Việt) ----- */
+function exportContractsCSV(rows) {
+  const headers = ['Số HĐ', 'CDT', 'MST', 'Loại DV', 'Ngày ký', 'Giá trị', 'Trạng thái', 'Hồ sơ']
+  const esc = v => {
+    const s = String(v ?? '')
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const lines = [headers.join(',')]
+  for (const c of rows) {
+    lines.push([
+      esc(c.contractNumber),
+      esc(c.customerName),
+      esc(c.customerTaxCode),
+      esc(c.serviceType),
+      esc(c.signDate),
+      esc(c.totalValue),
+      esc(c.status),
+      esc(`${c.uploadedCount}/${c.totalDocs}`),
+    ].join(','))
+  }
+  const csv = '\uFEFF' + lines.join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `hop-dong-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }

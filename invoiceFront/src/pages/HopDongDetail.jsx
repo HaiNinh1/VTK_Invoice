@@ -209,6 +209,22 @@ export default function HopDongDetail() {
               )}
             </CardContent>
           </Card>
+
+          {/* Tiến độ thanh toán — Prompt 14 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Tiến độ thanh toán</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {requests.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Chưa có đề nghị nào để hiển thị tiến độ.
+                </p>
+              ) : (
+                <PaymentTimeline contract={contract} requests={requests} />
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* RIGHT — 1/3 */}
@@ -315,6 +331,54 @@ function Row({ label, value }) {
     <div className="flex items-center justify-between">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{value}</span>
+    </div>
+  )
+}
+
+
+/* ----- Tiến độ thanh toán: timeline ngắn các ĐN theo thời gian ----- */
+function PaymentTimeline({ contract, requests }) {
+  const sorted = [...requests].sort(
+    (a, b) => (a.createdDate ?? '').localeCompare(b.createdDate ?? ''),
+  )
+  const totalRequested = sorted.reduce((s, r) => s + r.valueAfterVAT, 0)
+  const pct = contract.totalValue
+    ? Math.min(100, Math.round((totalRequested / contract.totalValue) * 100))
+    : 0
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <div className="mb-1.5 flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">
+            Đã đề nghị {formatVND(totalRequested, true)} / {formatVND(contract.totalValue, true)}
+          </span>
+          <span className="font-medium">{pct}%</span>
+        </div>
+        <Progress value={pct} />
+      </div>
+      <ol className="relative space-y-3 border-l border-border pl-4">
+        {sorted.map(r => (
+          <li key={r.id} className="relative">
+            <span className="absolute -left-[19px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-card" aria-hidden />
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <Link to={`/de-nghi/${r.id}`} className="font-mono text-xs font-semibold text-primary hover:underline">
+                {r.id}
+              </Link>
+              <StatusBadge status={r.status} />
+            </div>
+            <div className="mt-0.5 flex items-center justify-between text-xs text-muted-foreground">
+              <span>{formatDate(r.createdDate)} · {r.paymentTerm}</span>
+              <span className="tabular-nums font-medium">{formatVND(r.valueAfterVAT, true)}</span>
+            </div>
+            {r.sInvoiceNumber && (
+              <div className="mt-0.5 text-[11px] text-green-700">
+                HĐ: <span className="font-mono">{r.sInvoiceNumber}</span>
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

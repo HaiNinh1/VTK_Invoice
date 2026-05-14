@@ -100,7 +100,7 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => navigate('/cai-dat')}>
+            <DropdownMenuItem onSelect={() => navigate('/ho-so-ca-nhan')}>
               <UserIcon className="h-4 w-4" /> Tài khoản
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => navigate('/cai-dat')}>

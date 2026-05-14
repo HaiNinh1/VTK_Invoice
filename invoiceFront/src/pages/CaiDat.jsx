@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import { ShieldCheck, KeyRound, FileCog, Users } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import {
+  ShieldCheck, KeyRound, FileCog, Users, Bell, Plus, Pencil, Trash2,
+  Check, X as XIcon, ToggleLeft, ToggleRight,
+} from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,21 +10,24 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { initials } from '@/components/shared/formatters'
-import {
-  USERS, INVOICE_TYPE_CONFIGS, ROLE_LABELS,
-} from '@/data/masterData'
+import { USERS, ROLE_LABELS } from '@/data/masterData'
 import { useRole } from '@/context/RoleContext'
 import { useToast } from '@/components/ui/toast'
+import { useInvoiceTypes } from '@/context/InvoiceTypesContext'
+import { useNotifications } from '@/context/NotificationsContext'
+import { cn } from '@/lib/utils'
 
 /* -----------------------------------------------------------------------
- * Page: "Cài đặt" — Spec: Prompt 9 + Prompt 12 + Prompt 18.
+ * Trang Cài đặt — Prompt 9 + 12 + 18.
  *
- * 4 tabs:
- *   Tài khoản     — current user profile + password change form
- *   Chữ ký số     — signature certificate status + setup CTA
- *   Loại HĐ       — invoice type configs (read-only listing)
- *   Người dùng    — users table (admin only, read-only here)
+ * 5 tabs:
+ *   Tài khoản  — quick view + đổi mật khẩu (chi tiết hơn ở /ho-so-ca-nhan)
+ *   Chữ ký số  — trạng thái CKS
+ *   Loại HĐ    — FULL CRUD theo Prompt 12 (loại + nhóm hồ sơ + tài liệu)
+ *   Thông báo  — toggles loại thông báo nhận
+ *   Người dùng — admin only, read-only
  * --------------------------------------------------------------------- */
 
 export default function CaiDat() {
@@ -44,12 +50,15 @@ export default function CaiDat() {
           <TabsTrigger value="loai-hd">
             <span className="inline-flex items-center gap-1.5"><FileCog className="h-4 w-4" /> Loại HĐ</span>
           </TabsTrigger>
+          <TabsTrigger value="thong-bao">
+            <span className="inline-flex items-center gap-1.5"><Bell className="h-4 w-4" /> Thông báo</span>
+          </TabsTrigger>
           <TabsTrigger value="nguoi-dung" disabled={role !== 'admin'}>
             <span className="inline-flex items-center gap-1.5"><Users className="h-4 w-4" /> Người dùng</span>
           </TabsTrigger>
         </TabsList>
 
-        {/* ----- Tab: Tài khoản ----- */}
+        {/* ----- Tab: Tài khoản (quick) ----- */}
         <TabsContent value="tai-khoan">
           <Card>
             <CardContent className="space-y-5 p-6">
@@ -57,7 +66,7 @@ export default function CaiDat() {
                 <Avatar className="h-14 w-14">
                   <AvatarFallback>{initials(user.name)}</AvatarFallback>
                 </Avatar>
-                <div>
+                <div className="flex-1">
                   <div className="text-lg font-semibold">{user.name}</div>
                   <div className="text-sm text-muted-foreground">{user.email}</div>
                   <div className="mt-1 flex gap-2">
@@ -65,6 +74,9 @@ export default function CaiDat() {
                     <Badge variant="muted">{user.department}</Badge>
                   </div>
                 </div>
+                <Button asChild variant="outline">
+                  <a href="/ho-so-ca-nhan">Mở hồ sơ</a>
+                </Button>
               </div>
               <Separator />
               <div className="grid gap-4 md:grid-cols-2">
@@ -110,41 +122,14 @@ export default function CaiDat() {
           </Card>
         </TabsContent>
 
-        {/* ----- Tab: Loại HĐ ----- */}
+        {/* ----- Tab: Loại HĐ (FULL CRUD) ----- */}
         <TabsContent value="loai-hd">
-          <Card>
-            <CardContent className="space-y-3 p-6">
-              <p className="text-sm text-muted-foreground">
-                Mỗi loại dịch vụ có danh mục hồ sơ pháp lý bắt buộc/khuyến nghị riêng.
-                Đề nghị xuất hoá đơn sẽ tự động sinh checklist tương ứng.
-              </p>
-              <div className="grid gap-3 md:grid-cols-2">
-                {INVOICE_TYPE_CONFIGS.map(cfg => (
-                  <Card key={cfg.id} className="border-border/60">
-                    <CardContent className="space-y-2 p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="font-semibold">{cfg.name}</div>
-                        <Badge variant={cfg.active ? 'success' : 'muted'}>
-                          {cfg.active ? 'Đang dùng' : 'Tạm ẩn'}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Loại DV: {cfg.serviceType} ·{' '}
-                        {cfg.documentGroups.reduce((s, g) => s + g.documents.length, 0)} hồ sơ
-                      </div>
-                      <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                        {cfg.documentGroups.map(g => (
-                          <li key={g.groupName}>
-                            • {g.groupName} ({g.documents.length})
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <InvoiceTypesEditor />
+        </TabsContent>
+
+        {/* ----- Tab: Thông báo ----- */}
+        <TabsContent value="thong-bao">
+          <NotificationSettings />
         </TabsContent>
 
         {/* ----- Tab: Người dùng (admin) ----- */}
@@ -192,11 +177,342 @@ export default function CaiDat() {
   )
 }
 
+/* ============================== HELPERS ============================== */
+
 function Field({ label, children }) {
   return (
     <label className="flex flex-col gap-1.5 text-sm">
       <span className="font-medium">{label}</span>
       {children}
     </label>
+  )
+}
+
+/* --------------------- Invoice Types CRUD editor --------------------- */
+
+function InvoiceTypesEditor() {
+  const {
+    types, addType, updateType, deleteType, toggleActive,
+    addGroup, renameGroup, deleteGroup,
+    addDocument, updateDocument, deleteDocument,
+  } = useInvoiceTypes()
+  const { toast } = useToast()
+  const [selectedId, setSelectedId] = useState(types[0]?.id ?? null)
+  const [confirmDelType, setConfirmDelType] = useState(null)
+  const [confirmDelGroup, setConfirmDelGroup] = useState(null)
+
+  // Re-sync selection if list changes externally
+  if (selectedId && !types.some(t => t.id === selectedId)) {
+    const next = types[0]?.id ?? null
+    setSelectedId(next)
+  }
+  const selected = types.find(t => t.id === selectedId) ?? null
+
+  function handleAddType() {
+    const name = window.prompt('Tên loại HĐ mới:')?.trim()
+    if (!name) return
+    const serviceType = window.prompt('Loại dịch vụ (mã ngắn):', name)?.trim() || name
+    const id = addType({ name, serviceType })
+    setSelectedId(id)
+    toast.success(`Đã thêm "${name}"`)
+  }
+
+  function handleRenameType(t) {
+    const name = window.prompt('Tên mới:', t.name)?.trim()
+    if (!name || name === t.name) return
+    const serviceType = window.prompt('Loại dịch vụ:', t.serviceType)?.trim() || t.serviceType
+    updateType(t.id, { name, serviceType })
+    toast.success('Đã cập nhật loại HĐ')
+  }
+
+  function handleAddGroup() {
+    if (!selected) return
+    const name = window.prompt('Tên nhóm hồ sơ mới:')?.trim()
+    if (!name) return
+    addGroup(selected.id, name)
+    toast.success(`Đã thêm nhóm "${name}"`)
+  }
+
+  function handleRenameGroup(groupIdx, oldName) {
+    const name = window.prompt('Tên nhóm:', oldName)?.trim()
+    if (!name || name === oldName) return
+    renameGroup(selected.id, groupIdx, name)
+  }
+
+  function handleAddDoc(groupIdx) {
+    const name = window.prompt('Tên tài liệu:')?.trim()
+    if (!name) return
+    addDocument(selected.id, groupIdx, { name, required: true })
+    toast.success(`Đã thêm "${name}"`)
+  }
+
+  function handleRenameDoc(groupIdx, doc) {
+    const name = window.prompt('Tên tài liệu:', doc.name)?.trim()
+    if (!name || name === doc.name) return
+    updateDocument(selected.id, groupIdx, doc.id, { name })
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="grid gap-0 lg:grid-cols-[260px_1fr]">
+          {/* Left: type list */}
+          <div className="border-b lg:border-b-0 lg:border-r">
+            <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Danh sách ({types.length})
+              </span>
+              <Button size="sm" onClick={handleAddType}>
+                <Plus className="h-3.5 w-3.5" /> Thêm
+              </Button>
+            </div>
+            <ul className="max-h-[60vh] overflow-y-auto divide-y">
+              {types.map(t => {
+                const docCount = t.documentGroups.reduce((s, g) => s + g.documents.length, 0)
+                const active = t.id === selectedId
+                return (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(t.id)}
+                      className={cn(
+                        'flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left text-sm transition-colors',
+                        active ? 'bg-primary/5' : 'hover:bg-accent/40',
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <div className={cn('truncate font-medium', active && 'text-primary')}>
+                          {t.name}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {t.serviceType} · {docCount} tài liệu
+                        </div>
+                      </div>
+                      <Badge variant={t.active ? 'success' : 'muted'} className="shrink-0 text-[10px]">
+                        {t.active ? 'Bật' : 'Tắt'}
+                      </Badge>
+                    </button>
+                  </li>
+                )
+              })}
+              {types.length === 0 && (
+                <li className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  Chưa có loại HĐ nào.
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {/* Right: detail editor */}
+          <div className="p-5">
+            {!selected ? (
+              <p className="text-sm text-muted-foreground">Chọn một loại HĐ ở danh sách bên trái để chỉnh sửa.</p>
+            ) : (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-semibold">{selected.name}</h2>
+                      <Badge variant={selected.active ? 'success' : 'muted'}>
+                        {selected.active ? 'Đang dùng' : 'Tạm ẩn'}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Loại DV: {selected.serviceType} · ID: <span className="font-mono">{selected.id}</span>
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleRenameType(selected)}>
+                      <Pencil className="h-3.5 w-3.5" /> Đổi tên
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { toggleActive(selected.id); toast.info(selected.active ? 'Đã tắt' : 'Đã bật') }}
+                    >
+                      {selected.active
+                        ? <><ToggleRight className="h-3.5 w-3.5" /> Tắt</>
+                        : <><ToggleLeft  className="h-3.5 w-3.5" /> Bật</>}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmDelType(selected)}
+                      className="text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Xóa
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Nhóm hồ sơ bắt buộc</h3>
+                  <Button size="sm" variant="outline" onClick={handleAddGroup}>
+                    <Plus className="h-3.5 w-3.5" /> Thêm nhóm
+                  </Button>
+                </div>
+
+                {selected.documentGroups.length === 0 && (
+                  <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                    Chưa có nhóm hồ sơ. Thêm nhóm đầu tiên để bắt đầu.
+                  </p>
+                )}
+
+                <div className="space-y-4">
+                  {selected.documentGroups.map((g, gi) => (
+                    <div key={gi} className="rounded-md border bg-card/60">
+                      <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold">{g.groupName}</div>
+                          <div className="text-[11px] text-muted-foreground">{g.documents.length} tài liệu</div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => handleRenameGroup(gi, g.groupName)} aria-label="Đổi tên nhóm">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setConfirmDelGroup({ idx: gi, name: g.groupName })}
+                            className="text-destructive"
+                            aria-label="Xóa nhóm"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <ul className="divide-y">
+                        {g.documents.map(d => (
+                          <li key={d.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate">{d.name}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => updateDocument(selected.id, gi, d.id, { required: !d.required })}
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors',
+                                d.required
+                                  ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                                  : 'bg-muted text-muted-foreground hover:bg-accent',
+                              )}
+                              title={d.required ? 'Đang bắt buộc — bấm để tắt' : 'Không bắt buộc — bấm để bật'}
+                            >
+                              {d.required ? 'Bắt buộc' : 'Tuỳ chọn'}
+                            </button>
+                            <Button size="sm" variant="ghost" onClick={() => handleRenameDoc(gi, d)} aria-label="Đổi tên">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => deleteDocument(selected.id, gi, d.id)}
+                              className="text-destructive"
+                              aria-label="Xóa tài liệu"
+                            >
+                              <XIcon className="h-3.5 w-3.5" />
+                            </Button>
+                          </li>
+                        ))}
+                        <li className="px-3 py-2">
+                          <Button size="sm" variant="ghost" className="text-xs" onClick={() => handleAddDoc(gi)}>
+                            <Plus className="h-3 w-3" /> Thêm tài liệu
+                          </Button>
+                        </li>
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+
+      <ConfirmModal
+        open={!!confirmDelType}
+        onOpenChange={(o) => !o && setConfirmDelType(null)}
+        title="Xóa loại HĐ?"
+        description={confirmDelType ? `Xóa "${confirmDelType.name}" sẽ làm các hợp đồng đang dùng loại này không còn checklist mặc định. Hành động không thể hoàn tác.` : ''}
+        confirmLabel="Xóa"
+        confirmVariant="destructive"
+        onConfirm={() => {
+          if (!confirmDelType) return
+          deleteType(confirmDelType.id)
+          toast.success(`Đã xóa "${confirmDelType.name}"`)
+          setConfirmDelType(null)
+        }}
+      />
+      <ConfirmModal
+        open={!!confirmDelGroup}
+        onOpenChange={(o) => !o && setConfirmDelGroup(null)}
+        title="Xóa nhóm hồ sơ?"
+        description={confirmDelGroup ? `Xóa nhóm "${confirmDelGroup.name}" sẽ xóa luôn các tài liệu trong nhóm.` : ''}
+        confirmLabel="Xóa"
+        confirmVariant="destructive"
+        onConfirm={() => {
+          if (!confirmDelGroup || !selected) return
+          deleteGroup(selected.id, confirmDelGroup.idx)
+          toast.success('Đã xóa nhóm hồ sơ')
+          setConfirmDelGroup(null)
+        }}
+      />
+    </Card>
+  )
+}
+
+/* Suppress unused import lint */
+void Check
+
+/* ------------------------ Notification settings ----------------------- */
+
+function NotificationSettings() {
+  const { settings, updateSettings } = useNotifications()
+  const { toast } = useToast()
+
+  const items = [
+    { key: 'pendingApproval', label: 'Đề nghị chờ duyệt', desc: 'Khi có ĐN mới cần duyệt (kế toán/quản trị).' },
+    { key: 'commitment',      label: 'Cam kết bổ sung',   desc: 'Nhắc các cam kết hồ sơ sắp đến hạn.' },
+    { key: 'approved',        label: 'ĐN của tôi đã duyệt', desc: 'Khi đề nghị của tôi được duyệt hoặc xuất HĐ.' },
+    { key: 'system',          label: 'Thông báo hệ thống', desc: 'Cập nhật phần mềm, nhắc nộp báo cáo định kỳ.' },
+  ]
+
+  function toggle(key) {
+    updateSettings({ [key]: !settings[key] })
+    toast.info(`${settings[key] ? 'Đã tắt' : 'Đã bật'} thông báo`)
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-1 p-2">
+        <ul className="divide-y">
+          {items.map(it => (
+            <li key={it.key} className="flex items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium">{it.label}</div>
+                <div className="text-xs text-muted-foreground">{it.desc}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggle(it.key)}
+                aria-pressed={!!settings[it.key]}
+                className={cn(
+                  'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors',
+                  settings[it.key] ? 'bg-primary' : 'bg-muted',
+                )}
+                aria-label={`Bật/tắt ${it.label}`}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-5 w-5 translate-x-0.5 translate-y-0.5 transform rounded-full bg-white shadow transition-transform',
+                    settings[it.key] && 'translate-x-[22px]',
+                  )}
+                />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   )
 }

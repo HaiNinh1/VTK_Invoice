@@ -242,13 +242,12 @@ function makeRequest(i) {
 export const INVOICE_REQUESTS = Array.from({ length: 15 }, (_, i) => makeRequest(i))
 
 // ----------------------- SIDEBAR NAV CONFIG --------------------------------
-// Driven by spec: 7 items (after Prompt 16). Each item declares which roles see it.
+// Driven by spec: 6 items (after Prompt 16 revised — Pháp lý gộp vào tab trong Đề nghị).
 // Component renders Lucide icon by name to keep this file framework-free.
 export const NAV_ITEMS = [
   { to: '/',          label: 'Việc cần làm',   icon: 'ClipboardList', roles: ['employee', 'manager', 'accountant', 'admin'] },
   { to: '/hop-dong',  label: 'Hợp đồng',       icon: 'FileText',      roles: ['employee', 'manager', 'accountant', 'admin'] },
   { to: '/de-nghi',   label: 'Đề nghị xuất HĐ', icon: 'FilePlus',     roles: ['employee', 'manager', 'accountant', 'admin'] },
-  { to: '/phap-ly',   label: 'Pháp lý',        icon: 'ShieldCheck',   roles: ['manager', 'accountant', 'admin'] },
   { to: '/phe-duyet', label: 'Phê duyệt',      icon: 'CheckSquare',   roles: ['employee', 'manager', 'accountant', 'admin'] },
   { to: '/s-invoice', label: 'S-Invoice',      icon: 'Monitor',       roles: ['accountant', 'admin'] },
   { to: '/cai-dat',   label: 'Cài đặt',        icon: 'Settings',      roles: ['accountant', 'admin'] },

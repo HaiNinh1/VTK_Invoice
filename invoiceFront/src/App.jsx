@@ -6,10 +6,11 @@ import HopDongDetail from '@/pages/HopDongDetail'
 import HopDongForm  from '@/pages/HopDongForm'
 import DeNghi       from '@/pages/DeNghi'
 import DeNghiForm   from '@/pages/DeNghiForm'
-import PhapLy       from '@/pages/PhapLy'
 import PheDuyet     from '@/pages/PheDuyet'
 import SInvoice     from '@/pages/SInvoice'
 import CaiDat       from '@/pages/CaiDat'
+import ThongBao     from '@/pages/ThongBao'
+import HoSoCaNhan   from '@/pages/HoSoCaNhan'
 import Login        from '@/pages/Login'
 import NotFound     from '@/pages/NotFound'
 
@@ -26,11 +27,12 @@ export default function App() {
         <Route path="/de-nghi"        element={<DeNghi     />} />
         <Route path="/de-nghi/moi"    element={<DeNghiForm />} />
         <Route path="/de-nghi/:id"    element={<DeNghiForm />} />
-        <Route path="/phap-ly"   element={<PhapLy     />} />
         <Route path="/phe-duyet" element={<PheDuyet   />} />
         <Route path="/phe-duyet/:id" element={<PheDuyet />} />
         <Route path="/s-invoice" element={<SInvoice   />} />
         <Route path="/cai-dat"   element={<CaiDat     />} />
+        <Route path="/thong-bao" element={<ThongBao   />} />
+        <Route path="/ho-so-ca-nhan" element={<HoSoCaNhan />} />
         <Route path="*"          element={<NotFound   />} />
       </Route>
     </Routes>
