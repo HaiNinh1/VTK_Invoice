@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 const buttonVariants = cva(
   [
     'inline-flex items-center justify-center gap-2 whitespace-nowrap',
-    'rounded-md text-sm font-semibold tracking-tight',
+    'rounded-lg text-sm font-semibold tracking-tight',
     'ring-offset-background transition-all duration-200',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
     'disabled:pointer-events-none disabled:opacity-50',
@@ -28,14 +28,14 @@ const buttonVariants = cva(
         link:
           'text-primary underline-offset-4 hover:underline px-0',
         gold:
-          'bg-[hsl(var(--gold))] text-[hsl(var(--gold-foreground))] shadow-xs hover:bg-[hsl(var(--gold)/0.92)]',
+          'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80 border border-border',
         warning:
-          'border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 shadow-xs',
+          'border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 shadow-xs',
       },
       size: {
-        default: 'h-11 px-4 py-2',
-        sm: 'h-9 rounded-md px-3 text-xs',
-        lg: 'h-12 rounded-md px-6 text-base',
+        default: 'h-10 px-4 py-2',
+        sm: 'h-8 rounded-md px-3 text-xs',
+        lg: 'h-12 rounded-lg px-6 text-base',
         icon: 'h-10 w-10',
       },
     },

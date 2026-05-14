@@ -38,7 +38,7 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-20 flex h-16 items-center justify-between bg-card/80 backdrop-blur-md px-4 md:px-8 border-b border-border"
+      className="sticky top-0 z-20 flex h-16 items-center justify-between bg-card/90 backdrop-blur-md px-4 md:px-8 border-b border-border"
       role="banner"
     >
       <div className="min-w-0">
@@ -81,8 +81,8 @@ export function Header() {
               aria-label="Tài khoản"
               className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-transform hover:scale-105"
             >
-              <Avatar className="h-9 w-9 ring-1 ring-border">
-                <AvatarFallback className="bg-gradient-to-br from-primary to-[hsl(var(--gold))] text-white font-semibold text-xs">
+              <Avatar className="h-9 w-9">
+                <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-xs">
                   {initials(user.name)}
                 </AvatarFallback>
               </Avatar>
@@ -93,7 +93,7 @@ export function Header() {
               <div className="text-sm font-semibold">{user.name}</div>
               <div className="text-xs text-muted-foreground mt-0.5">{user.email}</div>
               <div className="mt-1.5 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-medium">
-                <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--gold))]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                 <span className="text-muted-foreground">
                   {ROLE_LABELS[role]} · {user.department}
                 </span>

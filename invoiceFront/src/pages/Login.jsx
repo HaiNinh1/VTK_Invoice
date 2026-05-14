@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { LogIn, Eye, EyeOff, ShieldCheck, Sparkles } from 'lucide-react'
+import { LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -11,9 +11,9 @@ import { useToast } from '@/components/ui/toast'
 import { ROLE_LABELS } from '@/data/masterData'
 
 /* -----------------------------------------------------------------------
- * Login — two-pane editorial layout.
- * Left  : lacquer-black brand panel with mesh + gold accents (desktop only)
- * Right : paper-feel card with form
+ * Login — modern two-pane layout.
+ * Left  : dark slate brand panel with indigo mesh (desktop only)
+ * Right : clean white card with form
  * --------------------------------------------------------------------- */
 
 export default function Login() {
@@ -56,20 +56,16 @@ export default function Login() {
             backgroundSize: '48px 48px',
           }}
         />
-        {/* gold corner accent */}
-        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-[hsl(var(--gold)/0.18)] blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-[hsl(var(--primary)/0.22)] blur-3xl" />
+        {/* indigo glow accents */}
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-[hsl(var(--primary)/0.25)] blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-[hsl(265_84%_60%/0.18)] blur-3xl" />
 
         {/* logo */}
         <div className="relative flex items-center gap-3">
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-xl tracking-tight shadow-lg">
-              V
-            </div>
-            <span className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full bg-[hsl(var(--gold))] ring-4 ring-[hsl(var(--sidebar-bg))]" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-xl tracking-tight shadow-lg">
+            V
           </div>
           <div className="leading-tight">
-            <div className="text-base font-semibold tracking-tight">VTK Hóa đơn</div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-[hsl(var(--sidebar-fg-muted))]">
               Viettel Telecom · 2026
             </div>
@@ -78,14 +74,14 @@ export default function Login() {
 
         {/* headline */}
         <div className="relative max-w-md space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[hsl(var(--gold)/0.3)] bg-[hsl(var(--gold)/0.06)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[hsl(var(--gold))]">
-            <Sparkles className="h-3 w-3" /> Phiên bản 2026
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-white/80">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Phiên bản 2026
           </div>
-          <h2 className="text-4xl font-semibold leading-[1.1] tracking-tight">
+          <h2 className="text-4xl font-display font-bold leading-[1.1] tracking-tight text-white">
             Quản trị hóa đơn,
             <br />
-            <span className="font-display italic text-[hsl(var(--gold))]">
-              tinh tế &amp; trọn vẹn.
+            <span className="text-[hsl(var(--primary-soft))]">
+              tinh gọn &amp; trọn vẹn.
             </span>
           </h2>
           <p className="text-[15px] leading-relaxed text-[hsl(var(--sidebar-fg))]">
@@ -107,7 +103,7 @@ export default function Login() {
 
         {/* footer signal */}
         <div className="relative flex items-center gap-3 text-[11px] text-[hsl(var(--sidebar-fg-muted))]">
-          <ShieldCheck className="h-4 w-4 text-[hsl(var(--gold))]" />
+          <ShieldCheck className="h-4 w-4 text-primary" />
           Kết nối nội bộ Viettel · Mã hóa TLS 1.3 · Tuân thủ Nghị định 123/2020/NĐ-CP
         </div>
       </aside>
@@ -129,13 +125,13 @@ export default function Login() {
           </div>
 
           <div className="mb-6">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[hsl(var(--gold))] font-medium mb-2">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-primary font-semibold mb-2">
               Đăng nhập hệ thống
             </div>
-            <h1 className="text-3xl font-semibold tracking-tight leading-tight">
+            <h1 className="text-3xl font-display font-bold tracking-tight leading-tight">
               Xin chào,
               <br />
-              <span className="font-display italic text-primary">trở lại làm việc.</span>
+              <span className="text-primary">trở lại làm việc.</span>
             </h1>
             <p className="mt-3 text-sm text-muted-foreground">
               Phiên bản demo — chọn vai trò bên dưới để xem giao diện tương ứng.
