@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Contract;
+use App\Models\InvoiceType;
 use App\Models\User;
+use App\Policies\ContractPolicy;
+use App\Policies\InvoiceTypePolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(User::class, UserPolicy::class);
+        Gate::policy(Contract::class, ContractPolicy::class);
+        Gate::policy(InvoiceType::class, InvoiceTypePolicy::class);
 
         // FE-facing user codes look like "u1". Accept either "u1" or "1" in route params.
         Route::bind('user', function (string $value): User {
