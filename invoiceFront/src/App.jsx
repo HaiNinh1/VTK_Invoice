@@ -13,6 +13,7 @@ import ThongBao     from '@/pages/ThongBao'
 import HoSoCaNhan   from '@/pages/HoSoCaNhan'
 import Login        from '@/pages/Login'
 import NotFound     from '@/pages/NotFound'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 
 export default function App() {
   return (
@@ -27,10 +28,10 @@ export default function App() {
         <Route path="/de-nghi"        element={<DeNghi     />} />
         <Route path="/de-nghi/moi"    element={<DeNghiForm />} />
         <Route path="/de-nghi/:id"    element={<DeNghiForm />} />
-        <Route path="/phe-duyet" element={<PheDuyet   />} />
-        <Route path="/phe-duyet/:id" element={<PheDuyet />} />
-        <Route path="/s-invoice" element={<SInvoice   />} />
-        <Route path="/cai-dat"   element={<CaiDat     />} />
+        <Route path="/phe-duyet" element={<RoleGuard allow={['accountant','admin']}><PheDuyet /></RoleGuard>} />
+        <Route path="/phe-duyet/:id" element={<RoleGuard allow={['accountant','admin']}><PheDuyet /></RoleGuard>} />
+        <Route path="/s-invoice" element={<RoleGuard allow={['accountant','admin']}><SInvoice /></RoleGuard>} />
+        <Route path="/cai-dat"   element={<RoleGuard allow={['accountant','admin']}><CaiDat /></RoleGuard>} />
         <Route path="/thong-bao" element={<ThongBao   />} />
         <Route path="/ho-so-ca-nhan" element={<HoSoCaNhan />} />
         <Route path="*"          element={<NotFound   />} />

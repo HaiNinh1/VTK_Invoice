@@ -18,11 +18,12 @@ import {
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND, formatDate } from '@/components/shared/formatters'
-import { INVOICE_REQUESTS } from '@/data/masterData'
+import { useRequests } from '@/context/RequestsContext'
 import { useContracts } from '@/context/ContractsContext'
 import { useInvoiceTypes } from '@/context/InvoiceTypesContext'
 import { useRole } from '@/context/RoleContext'
 import { useToast } from '@/components/ui/toast'
+import { useNotifications } from '@/context/NotificationsContext'
 
 /* -----------------------------------------------------------------------
  * Trang Đề nghị xuất HĐ — Prompt 5 + 6 + 13 + 15 + 16-revised.
@@ -45,26 +46,26 @@ const DEPT_OPTIONS = ['Tất cả', 'KV1', 'KV2', 'KV3', 'KV4', 'KV5', 'DL', 'DD
 
 export default function DeNghi() {
   const { user, role } = useRole()
+  const { requests, recallRequest, exportRequest } = useRequests()
   const { toast } = useToast()
+  const { pushNotification } = useNotifications()
   const [tab, setTab] = useState('dang-xu-ly')
   const [query, setQuery] = useState('')
   const [dept, setDept] = useState('Tất cả')
-
-  // Local override layer for demo CRUD on requests (recall, export)
-  // Maps id → patched status to apply on top of seed data
-  const [overrides, setOverrides] = useState({})
 
   // Modals
   const [previewReq, setPreviewReq] = useState(null)
   const [confirmExport, setConfirmExport] = useState(null)
   const [confirmRecall, setConfirmRecall] = useState(null)
 
-  const allRequests = useMemo(
-    () => INVOICE_REQUESTS.map(r => overrides[r.id]
-      ? { ...r, ...overrides[r.id] }
-      : r),
-    [overrides],
-  )
+  // Role-based base scoping per spec Prompt 5
+  const allRequests = useMemo(() => {
+    if (role === 'accountant' || role === 'admin') return requests
+    if (role === 'manager') return requests.filter(r => r.department === user.department)
+    return requests.filter(r => r.createdById === user.id)
+  }, [requests, role, user])
+  const canSeeLegalTab = role === 'accountant' || role === 'manager' || role === 'admin'
+  const showCreatorCol = role !== 'employee'
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -81,6 +82,14 @@ export default function DeNghi() {
     })
   }, [allRequests, tab, query, dept])
 
+  // Pagination 10/page
+  const PAGE_SIZE = 10
+  const [page, setPage] = useState(1)
+  // Reset to page 1 when tab/query/dept changes
+  useMemo(() => { setPage(1) }, [tab, query, dept])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   const counts = useMemo(() => ({
     'dang-xu-ly': allRequests.filter(r => TAB_GROUPS['dang-xu-ly'].includes(r.status)).length,
     'cho-xuat':   allRequests.filter(r => TAB_GROUPS['cho-xuat'].includes(r.status)).length,
@@ -89,17 +98,33 @@ export default function DeNghi() {
   }), [allRequests])
 
   function doRecall(req) {
-    setOverrides(prev => ({ ...prev, [req.id]: { ...prev[req.id], status: 'Nháp' } }))
+    const res = recallRequest(req.id, user.id)
+    if (!res.ok) {
+      toast.error(res.reason ?? 'Không thể thu hồi')
+      return
+    }
+    pushNotification({
+      kind: 'system',
+      title: `ĐN đã thu hồi: ${req.id}`,
+      description: `${req.customerName} — ${user?.name ?? 'Nhân viên'} đã thu hồi`,
+      to: `/de-nghi/${req.id}`,
+    })
     toast.success(`Đã thu hồi ${req.id} — chuyển về Nháp`)
   }
 
   function doExport(req) {
-    const sInvoiceNumber = `K26TYY${Math.floor(1000000 + Math.random() * 8999999)}`
-    setOverrides(prev => ({
-      ...prev,
-      [req.id]: { ...prev[req.id], status: 'Đã xuất HĐ', sInvoiceNumber },
-    }))
-    toast.success(`Đã xuất HĐ ${sInvoiceNumber}`)
+    const res = exportRequest(req.id)
+    if (!res.ok) {
+      toast.error(res.reason ?? 'Không thể xuất HĐ')
+      return
+    }
+    pushNotification({
+      kind: 'export',
+      title: `Đã xuất HĐ: ${res.sInvoiceNumber}`,
+      description: `${req.customerName} — ${formatVND(req.valueAfterVAT)}`,
+      to: `/de-nghi/${req.id}`,
+    })
+    toast.success(`Đã xuất HĐ ${res.sInvoiceNumber}`)
   }
 
   return (
@@ -117,11 +142,13 @@ export default function DeNghi() {
         <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">
           <TabsTrigger value="dang-xu-ly">Đang xử lý ({counts['dang-xu-ly']})</TabsTrigger>
           <TabsTrigger value="cho-xuat">Chờ xuất HĐ ({counts['cho-xuat']})</TabsTrigger>
-          <TabsTrigger value="ho-so-phap-ly">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5" /> Hồ sơ pháp lý
-            </span>
-          </TabsTrigger>
+          {canSeeLegalTab && (
+            <TabsTrigger value="ho-so-phap-ly">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5" /> Hồ sơ pháp lý
+              </span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="da-xuat">Đã xuất ({counts['da-xuat']})</TabsTrigger>
           <TabsTrigger value="tu-choi">Từ chối ({counts['tu-choi']})</TabsTrigger>
         </TabsList>
@@ -137,30 +164,37 @@ export default function DeNghi() {
         {/* ----- Tab content: list-style tabs ----- */}
         <TabsContent value="dang-xu-ly">
           <RequestTable
-            rows={filtered}
+            rows={paged}
             currentUserId={user.id}
             onRecall={r => setConfirmRecall(r)}
+            showCreatorCol={showCreatorCol}
           />
+          <Pagination page={page} setPage={setPage} totalPages={totalPages} totalRows={filtered.length} />
         </TabsContent>
 
         <TabsContent value="cho-xuat">
           <PendingExportCards
-            rows={filtered}
+            rows={paged}
             onPreview={r => setPreviewReq(r)}
             onConfirmExport={r => setConfirmExport(r)}
           />
+          <Pagination page={page} setPage={setPage} totalPages={totalPages} totalRows={filtered.length} />
         </TabsContent>
 
-        <TabsContent value="ho-so-phap-ly">
-          <LegalDossiersTab />
-        </TabsContent>
+        {canSeeLegalTab && (
+          <TabsContent value="ho-so-phap-ly">
+            <LegalDossiersTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="da-xuat">
-          <RequestTable rows={filtered} currentUserId={user.id} onRecall={null} />
+          <RequestTable rows={paged} currentUserId={user.id} onRecall={null} showCreatorCol={showCreatorCol} />
+          <Pagination page={page} setPage={setPage} totalPages={totalPages} totalRows={filtered.length} />
         </TabsContent>
 
         <TabsContent value="tu-choi">
-          <RequestTable rows={filtered} currentUserId={user.id} onRecall={null} />
+          <RequestTable rows={paged} currentUserId={user.id} onRecall={null} showCreatorCol={showCreatorCol} />
+          <Pagination page={page} setPage={setPage} totalPages={totalPages} totalRows={filtered.length} />
         </TabsContent>
       </Tabs>
 
@@ -188,8 +222,7 @@ export default function DeNghi() {
         onConfirm={() => { if (confirmRecall) doRecall(confirmRecall) }}
       />
 
-      {/* Suppress unused */}
-      {void role}
+
     </div>
   )
 }
@@ -222,7 +255,24 @@ function ListFilters({ query, setQuery, dept, setDept }) {
   )
 }
 
-function RequestTable({ rows, currentUserId, onRecall }) {
+function Pagination({ page, setPage, totalPages, totalRows }) {
+  if (totalRows === 0) return null
+  return (
+    <div className="mt-3 flex items-center justify-between text-sm">
+      <span className="text-muted-foreground">Trang {page}/{totalPages} · {totalRows} đề nghị</span>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+          Trước
+        </Button>
+        <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+          Sau
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function RequestTable({ rows, currentUserId, onRecall, showCreatorCol }) {
   return (
     <>
       <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
@@ -238,7 +288,8 @@ function RequestTable({ rows, currentUserId, onRecall }) {
                 <th className="px-4 py-3">CĐT</th>
                 <th className="px-4 py-3 text-right">Giá trị</th>
                 <th className="px-4 py-3">Đơn vị</th>
-                <th className="px-4 py-3">Người tạo</th>
+                {showCreatorCol && <th className="px-4 py-3">Người tạo</th>}
+                <th className="px-4 py-3">Pháp lý</th>
                 <th className="px-4 py-3">Trạng thái</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -257,7 +308,14 @@ function RequestTable({ rows, currentUserId, onRecall }) {
                   <td className="px-4 py-3">{r.customerName}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{formatVND(r.valueAfterVAT, true)}</td>
                   <td className="px-4 py-3">{r.department}</td>
-                  <td className="px-4 py-3">{r.createdBy}</td>
+                  {showCreatorCol && <td className="px-4 py-3">{r.createdBy}</td>}
+                  <td className="px-4 py-3">
+                    {r.legalChecklist ? (
+                      <span className={r.legalChecklist.checked === r.legalChecklist.total ? 'text-green-700 font-medium' : 'text-amber-700 font-medium'}>
+                        {r.legalChecklist.checked}/{r.legalChecklist.total}
+                      </span>
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </td>
                   <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                   <td className="px-4 py-3 text-right">
                     {onRecall && r.status === 'Chờ duyệt' && r.createdById === currentUserId && (
@@ -275,7 +333,7 @@ function RequestTable({ rows, currentUserId, onRecall }) {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={showCreatorCol ? 9 : 8} className="px-4 py-12 text-center text-muted-foreground">
                     Không có đề nghị phù hợp.
                   </td>
                 </tr>

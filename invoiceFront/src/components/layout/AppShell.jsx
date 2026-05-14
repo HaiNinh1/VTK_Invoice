@@ -5,16 +5,19 @@ import {
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { cn } from '@/lib/utils'
+import { useRole } from '@/context/RoleContext'
 
 const MOBILE_TABS = [
-  { to: '/',          label: 'Việc',     icon: ClipboardList },
-  { to: '/hop-dong',  label: 'HĐ',       icon: FileText },
-  { to: '/de-nghi',   label: 'Đề nghị',  icon: FilePlus },
-  { to: '/phe-duyet', label: 'Duyệt',    icon: CheckSquare },
-  { to: '/s-invoice', label: 'S-Inv',    icon: Monitor },
+  { to: '/',          label: 'Việc',     icon: ClipboardList, roles: ['employee','manager','accountant','admin'] },
+  { to: '/hop-dong',  label: 'HĐ',       icon: FileText, roles: ['employee','manager','accountant','admin'] },
+  { to: '/de-nghi',   label: 'Đề nghị',  icon: FilePlus, roles: ['employee','manager','accountant','admin'] },
+  { to: '/phe-duyet', label: 'Duyệt',    icon: CheckSquare, roles: ['accountant','admin'] },
+  { to: '/s-invoice', label: 'S-Inv',    icon: Monitor, roles: ['accountant','admin'] },
 ]
 
 export function AppShell() {
+  const { role } = useRole()
+  const visibleTabs = MOBILE_TABS.filter(t => t.roles.includes(role))
   return (
     <div className="flex h-full min-h-screen">
       <Sidebar />
@@ -31,9 +34,9 @@ export function AppShell() {
         {/* Mobile bottom tabs */}
         <nav
           aria-label="Điều hướng di động"
-          className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-card/95 backdrop-blur md:hidden"
+          className={cn('fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-card/95 backdrop-blur md:hidden', visibleTabs.length === 3 ? 'grid-cols-3' : visibleTabs.length === 4 ? 'grid-cols-4' : 'grid-cols-5')}
         >
-          {MOBILE_TABS.map(({ to, label, icon: Icon }) => (
+          {visibleTabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

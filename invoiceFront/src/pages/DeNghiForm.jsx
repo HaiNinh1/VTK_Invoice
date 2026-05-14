@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Save, Send, CheckCircle2, Circle, Undo2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,13 +12,12 @@ import { Separator } from '@/components/ui/separator'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND } from '@/components/shared/formatters'
-import {
-  INVOICE_REQUESTS,
-  getChecklistForServiceType,
-} from '@/data/masterData'
+import { useRequests } from '@/context/RequestsContext'
+import { useInvoiceTypes } from '@/context/InvoiceTypesContext'
 import { useContracts } from '@/context/ContractsContext'
 import { useRole } from '@/context/RoleContext'
 import { useToast } from '@/components/ui/toast'
+import { useNotifications } from '@/context/NotificationsContext'
 
 /* -----------------------------------------------------------------------
  * Page: "Đề nghị xuất HĐ" — Form (Create + Detail/Edit)
@@ -29,52 +28,107 @@ import { useToast } from '@/components/ui/toast'
  *   /de-nghi/:id    → load existing request (read-only for non-draft)
  * --------------------------------------------------------------------- */
 
-const PAYMENT_TERMS  = ['Đợt 1', 'Đợt 2', 'Thanh toán cuối']
+const PAYMENT_TERMS  = ['Tạm ứng', 'Đợt 1', 'Đợt 2', 'Đợt 3', 'Thanh toán cuối', '1 lần']
 const INVOICE_KINDS  = ['Tạo mới', 'Điều chỉnh', 'Thay thế']
+const PAYMENT_METHODS = ['Chuyển khoản', 'Tiền mặt', 'Bù trừ']
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function DeNghiForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { toast } = useToast()
+  const { pushNotification } = useNotifications()
   const { contracts } = useContracts()
   const { user } = useRole()
+  const { requests, addRequest, updateRequest, submitRequest, recallRequest } = useRequests()
+  const { types } = useInvoiceTypes()
   const existing = id && id !== 'moi'
-    ? INVOICE_REQUESTS.find(r => r.id === id)
+    ? requests.find(r => r.id === id)
     : null
 
-  // Form state (mock — local only)
-  const [contractId, setContractId] = useState(existing?.contractId ?? '')
+  // Form state — dùng store thật thông qua addRequest/updateRequest
+  const [contractId, setContractId] = useState(
+    existing?.contractId ?? searchParams.get('contract') ?? '',
+  )
   const [valueBeforeVAT, setValueBeforeVAT] = useState(existing?.valueBeforeVAT ?? 0)
   const [vatRate, setVatRate] = useState(existing?.vatRate ?? 10)
-  const [paymentTerm, setPaymentTerm] = useState(existing?.paymentTerm ?? PAYMENT_TERMS[0])
+  const [paymentTerm, setPaymentTerm] = useState(existing?.paymentTerm ?? PAYMENT_TERMS[1])
+  const [paymentMethod, setPaymentMethod] = useState(existing?.paymentMethod ?? PAYMENT_METHODS[0])
   const [invoiceKind, setInvoiceKind] = useState(existing?.invoiceType ?? INVOICE_KINDS[0])
+  const [originalInvoiceNumber, setOriginalInvoiceNumber] = useState(existing?.originalInvoiceNumber ?? '')
+  const [adjustmentReason, setAdjustmentReason] = useState(existing?.adjustmentReason ?? '')
+  const [notes, setNotes] = useState(existing?.notes ?? '')
   const [buyerEmail, setBuyerEmail] = useState(existing?.buyerEmail ?? '')
+  const [emailError, setEmailError] = useState('')
   const [checked, setChecked] = useState(() => new Set())
-  const [commitment, setCommitment] = useState('')
+  const [commitment, setCommitment] = useState(existing?.commitmentText ?? '')
+  const [commitmentDeadline, setCommitmentDeadline] = useState(existing?.commitmentDeadline ?? '')
   const [tab, setTab] = useState('thong-tin')
   const [confirmRecall, setConfirmRecall] = useState(false)
-  const [recalled, setRecalled] = useState(false)
+
+  // Kết nối preselect query từ ?contract=
+  useEffect(() => {
+    if (!existing && !contractId && searchParams.get('contract')) {
+      setContractId(searchParams.get('contract'))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const contract = useMemo(
     () => contracts.find(c => c.id === contractId),
     [contracts, contractId],
   )
-  const checklist = useMemo(
-    () => contract ? getChecklistForServiceType(contract.serviceType) : [],
-    [contract],
-  )
+  const checklist = useMemo(() => {
+    if (!contract) return []
+    // Ưu tiên dynamic config từ InvoiceTypesContext, fallback static seed
+    const cfg = types.find(t => t.serviceType === contract.serviceType)
+    if (cfg?.documentGroups?.length) {
+      return cfg.documentGroups.map(g => ({
+        groupName: g.name ?? g.groupName,
+        documents: g.documents.map(d => ({ id: d.id, name: d.name, required: d.required !== false })),
+      }))
+    }
+    return []
+  }, [contract, types])
+  // Inherit checklist từ contract.documents — các tài liệu đã có file ở contract mặc định là checked + locked.
+  // Match theo name (case-insensitive).
+  const inheritedDocIds = useMemo(() => {
+    if (!contract || !checklist.length) return new Set()
+    const have = new Set((contract.documents ?? []).map(d => (d.name ?? '').toLowerCase().trim()))
+    const ids = new Set()
+    checklist.forEach(g => g.documents.forEach(d => {
+      if (have.has((d.name ?? '').toLowerCase().trim())) ids.add(d.id)
+    }))
+    return ids
+  }, [contract, checklist])
+
+  // Khi contract đổi → reset checked = inherited (nếu không phải existing)
+  useEffect(() => {
+    if (existing) return
+    setChecked(new Set(inheritedDocIds))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractId])
   const totalDocs = useMemo(
     () => checklist.reduce((s, g) => s + g.documents.length, 0),
     [checklist],
   )
   const vatAmount    = Math.round((Number(valueBeforeVAT) || 0) * vatRate / 100)
   const valueAfterVAT = (Number(valueBeforeVAT) || 0) + vatAmount
-  const effectiveStatus = recalled ? 'Nháp' : existing?.status
+  const effectiveStatus = existing?.status
   const readOnly = !!existing && effectiveStatus !== 'Nháp' && effectiveStatus !== 'Trả lại bổ sung'
   const canRecall = !!existing && effectiveStatus === 'Chờ duyệt' && existing.createdById === user.id
+  const needsAdjustmentFields = invoiceKind === 'Điều chỉnh' || invoiceKind === 'Thay thế'
+  const missingDocs = checklist.reduce((s, g) => s + g.documents.length, 0) - checked.size
+  const hasCommitment = missingDocs > 0
+  const submitDisabled = !contract
+    || (hasCommitment && (!commitment.trim() || !commitmentDeadline))
+    || (buyerEmail && !EMAIL_RE.test(buyerEmail))
+    || (needsAdjustmentFields && (!originalInvoiceNumber.trim() || !adjustmentReason.trim()))
 
   function toggleDoc(docId) {
     if (readOnly) return
+    if (inheritedDocIds.has(docId)) return // locked: inherited từ contract
     setChecked(prev => {
       const next = new Set(prev)
       if (next.has(docId)) next.delete(docId)
@@ -83,10 +137,91 @@ export default function DeNghiForm() {
     })
   }
 
+  function validateEmail(v) {
+    if (!v) { setEmailError(''); return true }
+    if (!EMAIL_RE.test(v)) { setEmailError('Email không hợp lệ'); return false }
+    setEmailError('')
+    return true
+  }
+
+  function buildPayload() {
+    return {
+      contractId,
+      contractNumber: contract?.contractNumber ?? '',
+      customerName: contract?.customerName ?? '',
+      customerTaxCode: contract?.customerTaxCode ?? '',
+      customerAddress: contract?.customerAddress ?? '',
+      serviceType: contract?.serviceType ?? '',
+      department: contract?.department ?? '',
+      valueBeforeVAT: Number(valueBeforeVAT) || 0,
+      vatRate,
+      paymentTerm,
+      paymentMethod,
+      invoiceType: invoiceKind,
+      originalInvoiceNumber: needsAdjustmentFields ? originalInvoiceNumber.trim() : null,
+      adjustmentReason: needsAdjustmentFields ? adjustmentReason.trim() : null,
+      buyerEmail,
+      notes,
+      hasCommitment,
+      commitmentText: hasCommitment ? commitment.trim() : null,
+      commitmentDeadline: hasCommitment ? commitmentDeadline : null,
+      legalChecklist: { total: totalDocs, checked: checked.size },
+      createdBy: user?.name ?? '',
+      createdById: user?.id ?? '',
+    }
+  }
+
+  function handleSaveDraft() {
+    if (buyerEmail && !validateEmail(buyerEmail)) return
+    const payload = buildPayload()
+    if (existing) {
+      updateRequest(existing.id, payload)
+      toast.success(`Đã lưu nháp ${existing.id}`)
+    } else {
+      const newId = addRequest({ ...payload, status: 'Nháp' })
+      toast.success(`Đã tạo nháp ${newId}`)
+      navigate(`/de-nghi/${newId}`)
+    }
+  }
+
   function handleSubmit() {
-    // Mock submit — in real app this would call API.
-    toast.success(`Đã gửi đề nghị ${existing?.id ?? '(mới)'} để duyệt (demo)`)
-    navigate('/de-nghi')
+    if (!contract) { toast.warning('Vui lòng chọn hợp đồng'); return }
+    if (buyerEmail && !validateEmail(buyerEmail)) return
+    if (needsAdjustmentFields && (!originalInvoiceNumber.trim() || !adjustmentReason.trim())) {
+      toast.warning('Vui lòng nhập Số HĐ gốc và Lý do cho loại Điều chỉnh/Thay thế')
+      return
+    }
+    if (hasCommitment && (!commitment.trim() || !commitmentDeadline)) {
+      toast.warning('Hồ sơ còn thiếu — vui lòng ghi cam kết và hạn bổ sung')
+      return
+    }
+    const payload = buildPayload()
+    let targetId
+    if (existing) {
+      updateRequest(existing.id, payload)
+      submitRequest(existing.id)
+      targetId = existing.id
+    } else {
+      targetId = addRequest({ ...payload, status: 'Chờ duyệt' })
+    }
+    toast.success(`Đã gửi duyệt ${targetId}`)
+    navigate(`/de-nghi/${targetId}`)
+  }
+
+  function handleRecall() {
+    if (!existing) return
+    const res = recallRequest(existing.id, user?.id)
+    if (!res.ok) {
+      toast.error(res.reason ?? 'Không thể thu hồi')
+      return
+    }
+    pushNotification({
+      kind: 'system',
+      title: `ĐN đã thu hồi: ${existing.id}`,
+      description: `${existing.customerName} — ${user?.name ?? 'Nhân viên'} đã thu hồi`,
+      to: `/de-nghi/${existing.id}`,
+    })
+    toast.success('Đã thu hồi đề nghị — chuyển về trạng thái Nháp')
   }
 
   return (
@@ -120,10 +255,10 @@ export default function DeNghiForm() {
                 <Undo2 className="h-4 w-4" /> Thu hồi
               </Button>
             )}
-            <Button variant="outline" onClick={() => toast.success('Đã lưu nháp (demo)')}>
+            <Button variant="outline" onClick={handleSaveDraft}>
               <Save className="h-4 w-4" /> Lưu nháp
             </Button>
-            <Button onClick={handleSubmit} disabled={!contract}>
+            <Button onClick={handleSubmit} disabled={submitDisabled}>
               <Send className="h-4 w-4" /> Gửi duyệt
             </Button>
           </div>
@@ -191,10 +326,13 @@ export default function DeNghiForm() {
                 <Input
                   type="email"
                   value={buyerEmail}
-                  onChange={e => setBuyerEmail(e.target.value)}
+                  onChange={e => { setBuyerEmail(e.target.value); validateEmail(e.target.value) }}
+                  onBlur={e => validateEmail(e.target.value)}
                   placeholder="ketoan@khachhang.vn"
                   disabled={readOnly}
+                  aria-invalid={!!emailError}
                 />
+                {emailError && <span className="text-xs text-red-600">{emailError}</span>}
               </Field>
 
               <Field label="Đợt thanh toán">
@@ -204,6 +342,45 @@ export default function DeNghiForm() {
                     {PAYMENT_TERMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </Field>
+
+              <Field label="Hình thức thanh toán">
+                <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={readOnly}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              {needsAdjustmentFields && (
+                <>
+                  <Field label="Số HĐ gốc *">
+                    <Input
+                      value={originalInvoiceNumber}
+                      onChange={e => setOriginalInvoiceNumber(e.target.value)}
+                      placeholder="VD: K26TYY0000123"
+                      disabled={readOnly}
+                    />
+                  </Field>
+                  <Field label="Lý do *">
+                    <Input
+                      value={adjustmentReason}
+                      onChange={e => setAdjustmentReason(e.target.value)}
+                      placeholder="Lý do điều chỉnh/thay thế"
+                      disabled={readOnly}
+                    />
+                  </Field>
+                </>
+              )}
+
+              <Field label="Ghi chú">
+                <Input
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="Ghi chú thêm (tùy chọn)"
+                  disabled={readOnly}
+                />
               </Field>
             </CardContent>
           </Card>
@@ -267,18 +444,25 @@ export default function DeNghiForm() {
                   <ul className="space-y-1">
                     {group.documents.map(doc => {
                       const on = checked.has(doc.id)
+                      const inherited = inheritedDocIds.has(doc.id)
                       return (
                         <li key={doc.id}>
                           <button
                             type="button"
                             onClick={() => toggleDoc(doc.id)}
-                            disabled={readOnly}
-                            className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none disabled:cursor-not-allowed"
+                            disabled={readOnly || inherited}
+                            className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-90"
+                            title={inherited ? 'Kế thừa từ hồ sơ hợp đồng — không thể bỏ chọn' : undefined}
                           >
                             {on
                               ? <CheckCircle2 className="h-5 w-5 text-green-600" aria-hidden />
                               : <Circle className="h-5 w-5 text-muted-foreground" aria-hidden />}
                             <span className="flex-1">{doc.name}</span>
+                            {inherited && (
+                              <span className="text-[10px] font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                                Kế thừa từ HĐ
+                              </span>
+                            )}
                             {doc.required && (
                               <span className="text-xs text-red-600">Bắt buộc</span>
                             )}
@@ -290,10 +474,10 @@ export default function DeNghiForm() {
                 </div>
               ))}
 
-              {contract && checked.size < totalDocs && (
-                <div className="rounded-md border border-dashed border-orange-400 bg-orange-50 p-4">
-                  <p className="mb-2 text-sm font-medium text-orange-900">
-                    Còn thiếu {totalDocs - checked.size} hồ sơ. Vui lòng ghi cam kết bổ sung:
+              {contract && hasCommitment && (
+                <div className="rounded-md border border-dashed border-orange-400 bg-orange-50 p-4 space-y-3">
+                  <p className="text-sm font-medium text-orange-900">
+                    Còn thiếu {missingDocs} hồ sơ. Vui lòng ghi cam kết bổ sung:
                   </p>
                   <textarea
                     rows={3}
@@ -303,6 +487,14 @@ export default function DeNghiForm() {
                     placeholder="VD: Bổ sung BB nghiệm thu trước 30/04/2026..."
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
+                  <Field label="Hạn bổ sung *">
+                    <Input
+                      type="date"
+                      value={commitmentDeadline}
+                      onChange={e => setCommitmentDeadline(e.target.value)}
+                      disabled={readOnly}
+                    />
+                  </Field>
                 </div>
               )}
             </CardContent>
@@ -319,10 +511,7 @@ export default function DeNghiForm() {
           : ''}
         confirmLabel="Thu hồi"
         confirmVariant="destructive"
-        onConfirm={() => {
-          setRecalled(true)
-          toast.success('Đã thu hồi đề nghị — chuyển về trạng thái Nháp')
-        }}
+        onConfirm={handleRecall}
       />
     </div>
   )

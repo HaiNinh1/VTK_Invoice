@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   ShieldCheck, KeyRound, FileCog, Users, Bell, Plus, Pencil, Trash2,
-  Check, X as XIcon, ToggleLeft, ToggleRight,
+  Check, X as XIcon, ToggleLeft, ToggleRight, Plug, Server, Mail,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -52,6 +52,9 @@ export default function CaiDat() {
           </TabsTrigger>
           <TabsTrigger value="thong-bao">
             <span className="inline-flex items-center gap-1.5"><Bell className="h-4 w-4" /> Thông báo</span>
+          </TabsTrigger>
+          <TabsTrigger value="ket-noi">
+            <span className="inline-flex items-center gap-1.5"><Plug className="h-4 w-4" /> Kết nối</span>
           </TabsTrigger>
           <TabsTrigger value="nguoi-dung" disabled={role !== 'admin'}>
             <span className="inline-flex items-center gap-1.5"><Users className="h-4 w-4" /> Người dùng</span>
@@ -130,6 +133,11 @@ export default function CaiDat() {
         {/* ----- Tab: Thông báo ----- */}
         <TabsContent value="thong-bao">
           <NotificationSettings />
+        </TabsContent>
+
+        {/* ----- Tab: Kết nối (Prompt 9) ----- */}
+        <TabsContent value="ket-noi">
+          <ConnectionsTab />
         </TabsContent>
 
         {/* ----- Tab: Người dùng (admin) ----- */}
@@ -471,10 +479,15 @@ function NotificationSettings() {
   const { toast } = useToast()
 
   const items = [
-    { key: 'pendingApproval', label: 'Đề nghị chờ duyệt', desc: 'Khi có ĐN mới cần duyệt (kế toán/quản trị).' },
-    { key: 'commitment',      label: 'Cam kết bổ sung',   desc: 'Nhắc các cam kết hồ sơ sắp đến hạn.' },
-    { key: 'approved',        label: 'ĐN của tôi đã duyệt', desc: 'Khi đề nghị của tôi được duyệt hoặc xuất HĐ.' },
-    { key: 'system',          label: 'Thông báo hệ thống', desc: 'Cập nhật phần mềm, nhắc nộp báo cáo định kỳ.' },
+    { key: 'pendingApproval',   label: 'Đề nghị chờ duyệt',       desc: 'Khi có ĐN mới cần duyệt (kế toán/quản trị).' },
+    { key: 'approved',          label: 'ĐN của tôi đã duyệt',      desc: 'Khi đề nghị của tôi được duyệt.' },
+    { key: 'rejected',          label: 'ĐN của tôi bị từ chối',      desc: 'Khi đề nghị bị từ chối.' },
+    { key: 'returned',          label: 'ĐN của tôi bị trả lại',    desc: 'Khi đề nghị bị trả lại để bổ sung hồ sơ.' },
+    { key: 'exportSuccess',     label: 'Xuất HĐ thành công',      desc: 'Khi hóa đơn điện tử được phát hành thành công.' },
+    { key: 'exportError',       label: 'Xuất HĐ lỗi',              desc: 'Khi cổng S-Invoice phản hồi lỗi, cần thử lại.' },
+    { key: 'legalDueSoon',      label: 'Cam kết sắp đến hạn',       desc: 'Nhắc cam kết bổ sung hồ sơ còn ≤ 3 ngày.' },
+    { key: 'commitmentOverdue', label: 'Cam kết quá hạn',           desc: 'Cam kết đã quá hạn nhưng chưa bổ sung.' },
+    { key: 'system',            label: 'Thông báo hệ thống',         desc: 'Cập nhật phần mềm, nhắc nộp báo cáo định kỳ (mặc định tắt).' },
   ]
 
   function toggle(key) {
@@ -515,4 +528,131 @@ function NotificationSettings() {
       </CardContent>
     </Card>
   )
+}
+
+/* --------------------------- Connections tab -------------------------- */
+
+function ConnectionsTab() {
+  const { toast } = useToast()
+  const [sInvoiceStatus, setSInvoiceStatus] = useState({ state: 'unknown', message: '' })
+  const [smtpStatus, setSmtpStatus] = useState({ state: 'unknown', message: '' })
+  const [sInvoiceForm, setSInvoiceForm] = useState({
+    endpoint: 'https://api-vinvoice.viettel.vn',
+    taxCode: '0100109106',
+    username: 'vtk-prod',
+  })
+  const [smtpForm, setSmtpForm] = useState({
+    host: 'smtp.viettel.com.vn',
+    port: '465',
+    username: 'no-reply@vtk.vn',
+    from: 'VTK Hoá đơn <no-reply@vtk.vn>',
+  })
+
+  function testSInvoice() {
+    setSInvoiceStatus({ state: 'testing', message: 'Đang gửi gói kiểm tra...' })
+    setTimeout(() => {
+      setSInvoiceStatus({ state: 'ok', message: `Kết nối thành công · MST ${sInvoiceForm.taxCode}` })
+      toast.success('Cổng S-Invoice phản hồi OK')
+    }, 700)
+  }
+
+  function testSmtp() {
+    setSmtpStatus({ state: 'testing', message: 'Đang gửi email test...' })
+    setTimeout(() => {
+      setSmtpStatus({ state: 'ok', message: `Đã gửi mail test tới ${smtpForm.username}` })
+      toast.success('SMTP phản hồi OK')
+    }, 700)
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {/* S-Invoice Viettel */}
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="flex items-center gap-2">
+            <Server className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">Cổng S-Invoice Viettel</h3>
+            <ConnStatusBadge status={sInvoiceStatus.state} />
+          </div>
+          <div className="grid gap-3">
+            <Field label="Endpoint">
+              <Input value={sInvoiceForm.endpoint} onChange={e => setSInvoiceForm({ ...sInvoiceForm, endpoint: e.target.value })} />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="MST đơn vị">
+                <Input value={sInvoiceForm.taxCode} onChange={e => setSInvoiceForm({ ...sInvoiceForm, taxCode: e.target.value })} />
+              </Field>
+              <Field label="Tài khoản API">
+                <Input value={sInvoiceForm.username} onChange={e => setSInvoiceForm({ ...sInvoiceForm, username: e.target.value })} />
+              </Field>
+            </div>
+            {sInvoiceStatus.message && (
+              <div className={cn('rounded-md border px-3 py-2 text-xs',
+                sInvoiceStatus.state === 'ok' ? 'border-green-200 bg-green-50 text-green-800' :
+                sInvoiceStatus.state === 'error' ? 'border-red-200 bg-red-50 text-red-800' :
+                'border-amber-200 bg-amber-50 text-amber-800',
+              )}>
+                {sInvoiceStatus.message}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => toast.success('Đã lưu cấu hình (demo)')}>Lưu</Button>
+            <Button onClick={testSInvoice} disabled={sInvoiceStatus.state === 'testing'}>
+              <Plug className="h-4 w-4" /> {sInvoiceStatus.state === 'testing' ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SMTP Email */}
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">Email SMTP</h3>
+            <ConnStatusBadge status={smtpStatus.state} />
+          </div>
+          <div className="grid gap-3">
+            <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
+              <Field label="SMTP Host">
+                <Input value={smtpForm.host} onChange={e => setSmtpForm({ ...smtpForm, host: e.target.value })} />
+              </Field>
+              <Field label="Port">
+                <Input value={smtpForm.port} onChange={e => setSmtpForm({ ...smtpForm, port: e.target.value })} />
+              </Field>
+            </div>
+            <Field label="Tài khoản">
+              <Input value={smtpForm.username} onChange={e => setSmtpForm({ ...smtpForm, username: e.target.value })} />
+            </Field>
+            <Field label="From">
+              <Input value={smtpForm.from} onChange={e => setSmtpForm({ ...smtpForm, from: e.target.value })} />
+            </Field>
+            {smtpStatus.message && (
+              <div className={cn('rounded-md border px-3 py-2 text-xs',
+                smtpStatus.state === 'ok' ? 'border-green-200 bg-green-50 text-green-800' :
+                smtpStatus.state === 'error' ? 'border-red-200 bg-red-50 text-red-800' :
+                'border-amber-200 bg-amber-50 text-amber-800',
+              )}>
+                {smtpStatus.message}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => toast.success('Đã lưu cấu hình (demo)')}>Lưu</Button>
+            <Button onClick={testSmtp} disabled={smtpStatus.state === 'testing'}>
+              <Mail className="h-4 w-4" /> {smtpStatus.state === 'testing' ? 'Đang gửi...' : 'Gửi mail test'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function ConnStatusBadge({ status }) {
+  if (status === 'ok')      return <Badge variant="success">Đã kết nối</Badge>
+  if (status === 'error')   return <Badge variant="destructive">Lỗi</Badge>
+  if (status === 'testing') return <Badge variant="warning">Đang kiểm tra...</Badge>
+  return <Badge variant="muted">Chưa kiểm tra</Badge>
 }

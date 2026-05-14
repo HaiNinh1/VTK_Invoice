@@ -10,6 +10,7 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND, formatDate } from '@/components/shared/formatters'
 import { useContracts } from '@/context/ContractsContext'
+import { useRole } from '@/context/RoleContext'
 import { cn } from '@/lib/utils'
 
 /* -----------------------------------------------------------------------
@@ -25,12 +26,17 @@ const STATUS_FILTERS = ['Tất cả', 'Đang thực hiện', 'Đã quyết toán
 
 export default function HopDong() {
   const { contracts } = useContracts()
+  const { role, user } = useRole()
+  const scopeAll = role === 'accountant' || role === 'admin'
+  const visibleContracts = scopeAll
+    ? contracts
+    : contracts.filter(c => c.department === user.department)
   const [query,  setQuery]  = useState('')
   const [status, setStatus] = useState('Tất cả')
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return contracts.filter(c => {
+    return visibleContracts.filter(c => {
       const matchesQuery =
         !q ||
         c.contractNumber.toLowerCase().includes(q) ||
@@ -38,7 +44,7 @@ export default function HopDong() {
       const matchesStatus = status === 'Tất cả' || c.status === status
       return matchesQuery && matchesStatus
     })
-  }, [contracts, query, status])
+  }, [visibleContracts, query, status])
 
   return (
     <div className="space-y-5">

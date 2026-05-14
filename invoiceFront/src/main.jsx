@@ -8,6 +8,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { ContractsProvider } from '@/context/ContractsContext'
 import { NotificationsProvider } from '@/context/NotificationsContext'
 import { InvoiceTypesProvider } from '@/context/InvoiceTypesContext'
+import { RequestsProvider } from '@/context/RequestsContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -16,9 +17,11 @@ createRoot(document.getElementById('root')).render(
         <ToastProvider>
           <ContractsProvider>
             <InvoiceTypesProvider>
-              <NotificationsProvider>
-                <App />
-              </NotificationsProvider>
+              <RequestsProvider>
+                <NotificationsProvider>
+                  <App />
+                </NotificationsProvider>
+              </RequestsProvider>
             </InvoiceTypesProvider>
           </ContractsProvider>
         </ToastProvider>

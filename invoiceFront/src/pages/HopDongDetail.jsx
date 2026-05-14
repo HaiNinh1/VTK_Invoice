@@ -11,8 +11,10 @@ import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND, formatDate } from '@/components/shared/formatters'
-import { INVOICE_REQUESTS, getChecklistForServiceType } from '@/data/masterData'
 import { useContracts } from '@/context/ContractsContext'
+import { useInvoiceTypes } from '@/context/InvoiceTypesContext'
+import { useRequests } from '@/context/RequestsContext'
+import { useRole } from '@/context/RoleContext'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useToast } from '@/components/ui/toast'
 
@@ -30,9 +32,13 @@ export default function HopDongDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { getContract, deleteContract } = useContracts()
+  const { getContract, deleteContract, addDocument, deleteDocument } = useContracts()
+  const { role, user } = useRole()
   const contract = getContract(id)
   const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const { types } = useInvoiceTypes()
+  const { requests: allRequests } = useRequests()
 
   if (!contract) {
     return (
@@ -49,14 +55,54 @@ export default function HopDongDetail() {
     )
   }
 
-  const requests = INVOICE_REQUESTS.filter(r => r.contractId === contract.id)
+  const canViewByDept = role === 'accountant' || role === 'admin' || contract.department === user.department
+  if (!canViewByDept) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center space-y-2">
+          <p className="text-sm font-medium">Bạn không có quyền xem hợp đồng này</p>
+          <p className="text-xs text-muted-foreground">Hợp đồng thuộc đơn vị {contract.department}.</p>
+          <Button asChild variant="link" className="mt-2">
+            <Link to="/hop-dong">← Quay lại danh sách</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const requests = allRequests.filter(r => r.contractId === contract.id)
   const hasLinkedRequests = requests.length > 0
-  const groups = getChecklistForServiceType(contract.serviceType)
+  const dynamicCfg = types.find(t => t.serviceType === contract.serviceType)
+  const groups = dynamicCfg?.documentGroups?.length
+    ? dynamicCfg.documentGroups.map(g => ({
+        groupName: g.name ?? g.groupName,
+        documents: g.documents.map(d => ({ id: d.id, name: d.name, required: d.required !== false })),
+      }))
+    : []
   const totalDocs = contract.totalDocs
   const uploaded = contract.uploadedCount
   const pct = totalDocs ? Math.round((uploaded / totalDocs) * 100) : 0
 
   const uploadedByDocName = new Map(contract.documents.map(d => [d.name, d]))
+  const canUpload = ['employee','manager','accountant','admin'].includes(role)
+
+  function handleUpload(docName, groupName) {
+    if (!canUpload) return
+    const today = new Date().toISOString().slice(0, 10)
+    const safe = docName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+    addDocument(contract.id, {
+      name: docName,
+      group: groupName,
+      fileName: `${safe}_${Date.now()}.pdf`,
+      uploadDate: today,
+    })
+    toast.success(`Đã tải lên: ${docName}`)
+  }
+
+  function handleRemoveDoc(file) {
+    deleteDocument(contract.id, file.id)
+    toast.info(`Đã gỡ: ${file.name}`)
+  }
 
   return (
     <div className="space-y-6">
@@ -131,13 +177,6 @@ export default function HopDongDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-base">Hồ sơ pháp lý</CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => toast.info('Mở hộp thoại tải lên (demo)')}
-              >
-                <Upload className="h-4 w-4" /> Tải lên
-              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -189,12 +228,34 @@ export default function HopDongDetail() {
                                 </div>
                               </div>
                               {file ? (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    title="Tải xuống"
+                                    onClick={() => toast.success(`Tải xuống ${file.fileName} (demo)`)}
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                  {canUpload && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      title="Gỡ"
+                                      className="text-destructive hover:bg-destructive/10"
+                                      onClick={() => handleRemoveDoc(file)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ) : canUpload ? (
                                 <Button
                                   size="sm"
-                                  variant="ghost"
-                                  onClick={() => toast.success(`Tải xuống ${file.fileName} (demo)`)}
+                                  variant="outline"
+                                  onClick={() => handleUpload(d.name, g.groupName)}
                                 >
-                                  <Download className="h-4 w-4" />
+                                  <Upload className="h-4 w-4" /> Tải lên
                                 </Button>
                               ) : (
                                 <Badge variant="muted" className="text-[10px]">Chưa có</Badge>

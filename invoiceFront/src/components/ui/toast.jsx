@@ -47,12 +47,15 @@ export function ToastProvider({ children }) {
   const show = useCallback((opts) => {
     const t = typeof opts === 'string' ? { description: opts } : opts ?? {}
     const id = nextId()
+    // Spec: success/info 3s, error 5s, warning 4s. Caller có thể override bằng duration.
+    const variant = t.variant ?? 'info'
+    const defaultDuration = variant === 'error' ? 5000 : variant === 'warning' ? 4000 : 3000
     const item = {
       id,
       title: t.title ?? null,
       description: t.description ?? '',
-      variant: t.variant ?? 'info',
-      duration: t.duration ?? 3500,
+      variant,
+      duration: t.duration ?? defaultDuration,
     }
     setToasts(prev => [...prev, item])
     if (item.duration > 0) {

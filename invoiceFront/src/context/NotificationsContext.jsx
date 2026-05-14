@@ -1,35 +1,59 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react'
-import { INVOICE_REQUESTS } from '@/data/masterData'
 import { useRole } from '@/context/RoleContext'
+import { useRequests } from '@/context/RequestsContext'
 
 /* -----------------------------------------------------------------------
- * NotificationsContext — central notification store (Prompt 18).
+ * NotificationsContext — Prompt 18.
  *
- * Derives notifications from INVOICE_REQUESTS for the current user/role,
- * plus a few synthetic system events. Persists per-user "read" set + user
- * settings (which notification types are enabled) in localStorage.
+ * Settings (9 keys, persisted):
+ *   pendingApproval  — ĐN chờ duyệt (kế toán/admin)
+ *   approved         — ĐN của tôi được duyệt
+ *   rejected         — ĐN của tôi bị từ chối
+ *   returned         — ĐN của tôi bị trả lại bổ sung
+ *   exportSuccess    — Hoá đơn phát hành thành công
+ *   exportError      — Hoá đơn phát hành lỗi (cần thử lại)
+ *   legalDueSoon     — Hồ sơ pháp lý sắp đến hạn cam kết (≤ 3 ngày)
+ *   commitmentOverdue — Cam kết quá hạn chưa bổ sung
+ *   system           — Tin nội bộ / cập nhật phần mềm (DEFAULT OFF)
  *
- * Public API:
- *   const {
- *     notifications,      // derived list (filtered by role, sorted)
- *     unreadCount,
- *     markRead(id),
- *     markAllRead(),
- *     settings,           // { pendingApproval, commitment, approved, system }
- *     updateSettings(patch),
- *   } = useNotifications()
+ * Kind → Category (cho ThongBao tabs):
+ *   approval  : pendingApproval, approved, rejected, returned
+ *   legal     : legalDueSoon, commitmentOverdue
+ *   system    : exportSuccess, exportError, system
  * --------------------------------------------------------------------- */
 
 const READ_KEY     = 'vtk:notifications:read:v1'
-const SETTINGS_KEY = 'vtk:notifications:settings:v1'
+const SETTINGS_KEY = 'vtk:notifications:settings:v2'
+
+export const NOTIFICATION_KINDS = [
+  'pendingApproval', 'approved', 'rejected', 'returned',
+  'exportSuccess', 'exportError', 'legalDueSoon', 'commitmentOverdue', 'system',
+]
+
+export const KIND_TO_CATEGORY = {
+  pendingApproval: 'approval',
+  approved: 'approval',
+  rejected: 'approval',
+  returned: 'approval',
+  legalDueSoon: 'legal',
+  commitmentOverdue: 'legal',
+  exportSuccess: 'system',
+  exportError: 'system',
+  system: 'system',
+}
 
 const DEFAULT_SETTINGS = {
-  pendingApproval: true, // ĐN chờ duyệt (kế toán/admin)
-  commitment:      true, // cam kết bổ sung sắp đến hạn
-  approved:        true, // ĐN của tôi đã duyệt
-  system:          true, // tin nội bộ
+  pendingApproval:   true,
+  approved:          true,
+  rejected:          true,
+  returned:          true,
+  exportSuccess:     true,
+  exportError:       true,
+  legalDueSoon:      true,
+  commitmentOverdue: true,
+  system:            false, // DEFAULT OFF per spec
 }
 
 const NotificationsContext = createContext(null)
@@ -56,7 +80,7 @@ function loadSettings() {
   } catch { return DEFAULT_SETTINGS }
 }
 
-/** Synthetic system notifications — small, fixed list. */
+/** Synthetic system notifications — small fixed list. */
 const SYSTEM_EVENTS = [
   {
     id: 'sys-2026-001',
@@ -78,76 +102,126 @@ const SYSTEM_EVENTS = [
   },
 ]
 
-function buildAll(role, userId) {
+function today() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function daysBetween(aISO, bISO) {
+  if (!aISO || !bISO) return 0
+  const a = new Date(aISO).getTime()
+  const b = new Date(bISO).getTime()
+  return Math.round((a - b) / (1000 * 60 * 60 * 24))
+}
+
+function buildAll(role, userId, INV) {
   const items = []
+  const now = today()
 
-  // ĐN chờ duyệt — kế toán/admin
+  // pendingApproval — kế toán/admin
   if (role === 'accountant' || role === 'admin') {
-    INVOICE_REQUESTS
-      .filter(r => r.status === 'Chờ duyệt')
-      .forEach(r => items.push({
-        id: `pending-${r.id}`,
-        kind: 'pendingApproval',
-        title: `Đề nghị chờ duyệt: ${r.id}`,
-        description: r.customerName,
-        date: r.createdDate,
-        to: `/phe-duyet/${r.id}`,
-      }))
-  }
-
-  // Cam kết sắp đến hạn — của tôi
-  INVOICE_REQUESTS
-    .filter(r => r.hasCommitment && r.createdById === userId)
-    .forEach(r => items.push({
-      id: `commit-${r.id}`,
-      kind: 'commitment',
-      title: `Cam kết bổ sung: ${r.id}`,
-      description: `Hạn ${r.commitmentDeadline}`,
-      date: r.commitmentDeadline,
-      to: `/de-nghi/${r.id}`,
+    INV.filter(r => r.status === 'Chờ duyệt').forEach(r => items.push({
+      id: `pending-${r.id}`, kind: 'pendingApproval',
+      title: `Đề nghị chờ duyệt: ${r.id}`, description: r.customerName,
+      date: r.createdDate, to: `/phe-duyet/${r.id}`,
     }))
-
-  // ĐN của tôi đã duyệt — nhân viên/quản lý
-  if (role === 'employee' || role === 'manager') {
-    INVOICE_REQUESTS
-      .filter(r => r.createdById === userId && r.status === 'Đã duyệt')
-      .forEach(r => items.push({
-        id: `approved-${r.id}`,
-        kind: 'approved',
-        title: `Đã duyệt: ${r.id}`,
-        description: r.customerName,
-        date: r.approvedDate,
-        to: `/de-nghi/${r.id}`,
-      }))
   }
 
-  // Hệ thống
-  SYSTEM_EVENTS
-    .filter(s => s.roles.includes(role))
-    .forEach(s => items.push(s))
+  // approved / rejected / returned — creator
+  INV.filter(r => r.createdById === userId).forEach(r => {
+    if (r.status === 'Đã duyệt' || r.status === 'Đã xuất HĐ') {
+      items.push({
+        id: `approved-${r.id}`, kind: 'approved',
+        title: `Đã duyệt: ${r.id}`, description: r.customerName,
+        date: r.approvedDate, to: `/de-nghi/${r.id}`,
+      })
+    }
+    if (r.status === 'Từ chối') {
+      items.push({
+        id: `rejected-${r.id}`, kind: 'rejected',
+        title: `Từ chối: ${r.id}`, description: r.rejectReason || r.customerName,
+        date: r.approvedDate || r.createdDate, to: `/de-nghi/${r.id}`,
+      })
+    }
+    if (r.status === 'Trả lại bổ sung') {
+      items.push({
+        id: `returned-${r.id}`, kind: 'returned',
+        title: `Trả lại bổ sung: ${r.id}`, description: r.returnReason || r.customerName,
+        date: r.approvedDate || r.createdDate, to: `/de-nghi/${r.id}`,
+      })
+    }
+  })
 
+  // exportSuccess / exportError — kế toán/admin, tất cả requests đã xuất
+  if (role === 'accountant' || role === 'admin') {
+    INV.filter(r => r.status === 'Đã xuất HĐ').forEach(r => {
+      if (r.sInvoiceStatus === 'Lỗi') {
+        items.push({
+          id: `export-error-${r.id}`, kind: 'exportError',
+          title: `Phát hành HĐ lỗi: ${r.id}`,
+          description: r.sInvoiceError || 'Lỗi không xác định',
+          date: r.exportedAt || r.approvedDate, to: '/s-invoice',
+        })
+      } else if (r.sInvoiceNumber) {
+        items.push({
+          id: `export-ok-${r.id}`, kind: 'exportSuccess',
+          title: `Đã phát hành: ${r.sInvoiceNumber}`,
+          description: r.customerName,
+          date: r.exportedAt || r.approvedDate, to: '/s-invoice',
+        })
+      }
+    })
+  }
+
+  // commitmentOverdue & legalDueSoon — creator có cam kết
+  INV.filter(r => r.hasCommitment && r.createdById === userId && r.commitmentDeadline).forEach(r => {
+    const diff = daysBetween(r.commitmentDeadline, now) // > 0 còn ngày, < 0 quá hạn
+    if (diff < 0) {
+      items.push({
+        id: `commit-overdue-${r.id}`, kind: 'commitmentOverdue',
+        title: `Cam kết quá hạn: ${r.id}`,
+        description: `Hạn ${r.commitmentDeadline} (quá ${-diff} ngày)`,
+        date: r.commitmentDeadline, to: `/de-nghi/${r.id}`,
+      })
+    } else if (diff <= 3) {
+      items.push({
+        id: `legal-due-${r.id}`, kind: 'legalDueSoon',
+        title: `Cam kết sắp đến hạn: ${r.id}`,
+        description: `Còn ${diff} ngày — hạn ${r.commitmentDeadline}`,
+        date: r.commitmentDeadline, to: `/de-nghi/${r.id}`,
+      })
+    }
+  })
+
+  // System events
+  SYSTEM_EVENTS.filter(s => s.roles.includes(role)).forEach(s => items.push(s))
   return items.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
 }
 
 export function NotificationsProvider({ children }) {
   const { role, user } = useRole()
   const userId = user?.id
+  const { requests } = useRequests()
   const [readIds, setReadIds] = useState(() => loadSet(READ_KEY))
   const [settings, setSettings] = useState(loadSettings)
-
+  const [extras, setExtras] = useState([])
   useEffect(() => persistSet(READ_KEY, readIds), [readIds])
   useEffect(() => {
     if (typeof window === 'undefined') return
     try { window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)) } catch { /* ignore */ }
   }, [settings])
 
-  const all = useMemo(() => buildAll(role, userId), [role, userId])
+  const all = useMemo(
+    () => [...buildAll(role, userId, requests), ...extras].sort(
+      (a, b) => (b.date ?? '').localeCompare(a.date ?? ''),
+    ),
+    [role, userId, requests, extras],
+  )
 
   // Apply user settings filter
   const notifications = useMemo(
     () => all
       .filter(n => settings[n.kind] !== false)
-      .map(n => ({ ...n, read: readIds.has(n.id) })),
+      .map(n => ({ ...n, read: readIds.has(n.id), category: KIND_TO_CATEGORY[n.kind] ?? 'system' })),
     [all, settings, readIds],
   )
 
@@ -172,9 +246,19 @@ export function NotificationsProvider({ children }) {
     setSettings(prev => ({ ...prev, ...patch }))
   }, [])
 
+  const pushNotification = useCallback((evt) => {
+    setExtras(prev => [{
+      id: evt.id ?? `evt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      kind: evt.kind ?? 'system',
+      title: evt.title ?? '', description: evt.description ?? '',
+      date: evt.date ?? new Date().toISOString().slice(0, 10),
+      to: evt.to ?? '#',
+    }, ...prev])
+  }, [])
+
   const value = useMemo(
-    () => ({ notifications, unreadCount, markRead, markAllRead, settings, updateSettings }),
-    [notifications, unreadCount, markRead, markAllRead, settings, updateSettings],
+    () => ({ notifications, unreadCount, markRead, markAllRead, settings, updateSettings, pushNotification }),
+    [notifications, unreadCount, markRead, markAllRead, settings, updateSettings, pushNotification],
   )
 
   return (

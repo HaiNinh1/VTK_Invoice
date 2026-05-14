@@ -111,6 +111,35 @@ export function ContractsProvider({ children }) {
     setContracts(prev => prev.filter(c => c.id !== id))
   }, [])
 
+  /** Add an uploaded document to a contract. doc = {name, group, fileName, uploadDate} */
+  const addDocument = useCallback((contractId, doc) => {
+    setContracts(prev => prev.map(c => {
+      if (c.id !== contractId) return c
+      const docId = `doc-${contractId}-${Date.now()}-${Math.floor(Math.random()*1000)}`
+      const newDoc = { id: docId, ...doc }
+      const documents = [...c.documents, newDoc]
+      return { ...c, documents, uploadedCount: documents.length }
+    }))
+  }, [])
+
+  /** Update an uploaded document's metadata (e.g. replace file). */
+  const updateDocument = useCallback((contractId, docId, patch) => {
+    setContracts(prev => prev.map(c => {
+      if (c.id !== contractId) return c
+      const documents = c.documents.map(d => d.id === docId ? { ...d, ...patch } : d)
+      return { ...c, documents, uploadedCount: documents.length }
+    }))
+  }, [])
+
+  /** Remove an uploaded document from a contract. */
+  const deleteDocument = useCallback((contractId, docId) => {
+    setContracts(prev => prev.map(c => {
+      if (c.id !== contractId) return c
+      const documents = c.documents.filter(d => d.id !== docId)
+      return { ...c, documents, uploadedCount: documents.length }
+    }))
+  }, [])
+
   /** Look up by id (memo-friendly helper). */
   const getContract = useCallback(
     (id) => contracts.find(c => c.id === id) ?? null,
@@ -123,8 +152,8 @@ export function ContractsProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ contracts, addContract, updateContract, deleteContract, getContract, resetContracts }),
-    [contracts, addContract, updateContract, deleteContract, getContract, resetContracts],
+    () => ({ contracts, addContract, updateContract, deleteContract, addDocument, updateDocument, deleteDocument, getContract, resetContracts }),
+    [contracts, addContract, updateContract, deleteContract, addDocument, updateDocument, deleteDocument, getContract, resetContracts],
   )
 
   return (

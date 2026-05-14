@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, KeyRound, ShieldCheck, Mail, Building2, BadgeCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,17 +19,35 @@ import { ROLE_LABELS } from '@/data/masterData'
  * chữ ký số. Đây là page độc lập (không trộn vào Cài đặt nữa) để bám đúng
  * spec Prompt 19 — Profile page tách biệt.
  * --------------------------------------------------------------------- */
+const PROFILE_KEY = 'vtk:profile:v1'
+function loadProfile() {
+  if (typeof window === 'undefined') return {}
+  try { return JSON.parse(window.localStorage.getItem(PROFILE_KEY) || '{}') } catch { return {} }
+}
+
 export default function HoSoCaNhan() {
   const { role, user } = useRole()
   const { toast } = useToast()
-  const [name, setName] = useState(user.name)
-  const [email, setEmail] = useState(user.email)
+  const stored = loadProfile()
+  const [name, setName] = useState(stored.name ?? user.name)
+  const [email, setEmail] = useState(stored.email ?? user.email)
   const [currentPwd, setCurrentPwd] = useState('')
   const [newPwd, setNewPwd] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
+  const setupSig = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('setup') === 'signature'
+
+  useEffect(() => {
+    if (setupSig) toast.info('Vui lòng thiết lập chữ ký số để bắt đầu sử dụng hệ thống')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function handleSaveProfile() {
-    toast.success('Đã cập nhật hồ sơ (demo)')
+    try {
+      window.localStorage.setItem(PROFILE_KEY, JSON.stringify({ name, email, hasSignature: user.hasSignature }))
+      toast.success('Đã cập nhật hồ sơ')
+    } catch {
+      toast.error('Không thể lưu hồ sơ')
+    }
   }
 
   function handleChangePwd() {

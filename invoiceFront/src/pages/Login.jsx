@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/select'
 import { useRole } from '@/context/RoleContext'
 import { useToast } from '@/components/ui/toast'
-import { ROLE_LABELS } from '@/data/masterData'
+import { ROLE_LABELS, CURRENT_USER_BY_ROLE } from '@/data/masterData'
 
 /* -----------------------------------------------------------------------
  * Login — modern two-pane layout.
@@ -37,8 +37,15 @@ export default function Login() {
     setLoading(true)
     setTimeout(() => {
       setRole(role)
+      const u = CURRENT_USER_BY_ROLE[role]
+      const profile = JSON.parse(window.localStorage.getItem('vtk:profile:v1') || '{}')
+      const hasSig = profile.hasSignature ?? u?.hasSignature ?? false
       toast.success(`Đăng nhập thành công · ${ROLE_LABELS[role]}`)
-      navigate(state?.from ?? '/', { replace: true })
+      if (!hasSig) {
+        navigate('/ho-so-ca-nhan?setup=signature', { replace: true })
+      } else {
+        navigate(state?.from ?? '/', { replace: true })
+      }
     }, 350)
   }
 

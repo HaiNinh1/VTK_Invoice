@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND, formatDate } from '@/components/shared/formatters'
 import { useRole } from '@/context/RoleContext'
-import { INVOICE_REQUESTS } from '@/data/masterData'
+import { useRequests } from '@/context/RequestsContext'
 import { cn } from '@/lib/utils'
 
 /* -----------------------------------------------------------------------
@@ -33,9 +33,10 @@ import { cn } from '@/lib/utils'
 
 export default function ViecCanLam() {
   const { role, user } = useRole()
-
-  if (role === 'accountant') return <AccountantView />
-  if (role === 'admin')      return <AccountantView />
+  // Manager scoped by department, employee by createdById (own).
+  if (role === 'accountant' || role === 'admin') return <AccountantView />
+  if (role === 'manager')                       return <EmployeeView user={user} departmentScope />
+  return <EmployeeView user={user} />
 }
 
 /* ------------------------------ Helpers -------------------------------- */
@@ -106,8 +107,9 @@ function RequestCard({ req }) {
 /* --------------------------- Employee view ----------------------------- */
 
 function EmployeeView({ user, departmentScope }) {
+  const { requests: INV } = useRequests()
   // Section 1: my (or my dept's) recent requests
-  const myRequests = INVOICE_REQUESTS
+  const myRequests = INV
     .filter(r =>
       departmentScope
         ? r.department === user.department
@@ -117,16 +119,25 @@ function EmployeeView({ user, departmentScope }) {
     .slice(0, 5)
 
   // Section 2: drafts missing legal docs
-  const needsDocs = INVOICE_REQUESTS.filter(
-    r =>
-      r.createdById === user.id &&
-      r.status === 'Nháp' &&
-      r.legalChecklist.checked < r.legalChecklist.total,
+  const needsDocs = INV.filter(
+    r => {
+      const ownership = departmentScope
+        ? r.department === user.department
+        : r.createdById === user.id
+      return ownership &&
+        r.status === 'Nháp' &&
+        r.legalChecklist.checked < r.legalChecklist.total
+    },
   )
 
   // Section 3: open commitments
-  const commitments = INVOICE_REQUESTS.filter(
-    r => r.createdById === user.id && r.hasCommitment,
+  const commitments = INV.filter(
+    r => {
+      const ownership = departmentScope
+        ? r.department === user.department
+        : r.createdById === user.id
+      return ownership && r.hasCommitment
+    },
   )
 
   const title = departmentScope
@@ -239,12 +250,15 @@ function AccountantView() {
 }
 
 function AccountantQueue() {
-  const pending = INVOICE_REQUESTS
+  const { user } = useRole()
+  const { requests: INV } = useRequests()
+  const pending = INV
     .filter(r => r.status === 'Chờ duyệt')
     .sort((a, b) => a.createdDate.localeCompare(b.createdDate))
 
-  const recentApproved = INVOICE_REQUESTS
-    .filter(r => r.status === 'Đã duyệt' || r.status === 'Đã xuất HĐ')
+  const myId = user?.id
+  const recentApproved = INV
+    .filter(r => (r.status === 'Đã duyệt' || r.status === 'Đã xuất HĐ') && (!myId || r.approvedById === myId || !r.approvedById))
     .sort((a, b) => (b.approvedDate ?? '').localeCompare(a.approvedDate ?? ''))
     .slice(0, 5)
 
@@ -336,13 +350,14 @@ function AccountantQueue() {
 
 function AccountantReport() {
   const { toast } = useToast()
+  const { requests } = useRequests()
   const months = useMemo(() => {
-    const set = new Set(INVOICE_REQUESTS.map(r => r.createdDate.slice(0, 7)))
+    const set = new Set(requests.map(r => r.createdDate.slice(0, 7)))
     return Array.from(set).sort().reverse()
-  }, [])
+  }, [requests])
   const [month, setMonth] = useState(months[0] ?? 'all')
 
-  const scoped = INVOICE_REQUESTS.filter(
+  const scoped = requests.filter(
     r => month === 'all' || r.createdDate.startsWith(month),
   )
 
