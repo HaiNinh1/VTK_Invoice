@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND, formatDate } from '@/components/shared/formatters'
 import { INVOICE_REQUESTS } from '@/data/masterData'
+import { useToast } from '@/components/ui/toast'
 
 /* -----------------------------------------------------------------------
  * Page: "S-Invoice" — Spec: Prompt 8.
@@ -26,6 +27,7 @@ const TABS = [
 export default function SInvoice() {
   const [tab, setTab] = useState('thanh-cong')
   const [query, setQuery] = useState('')
+  const { toast } = useToast()
 
   const rows = useMemo(() => {
     const t = TABS.find(x => x.value === tab)
@@ -51,7 +53,7 @@ export default function SInvoice() {
             Đồng bộ trạng thái phát hành hoá đơn điện tử qua cổng Viettel S-Invoice.
           </p>
         </div>
-        <Button variant="outline" onClick={() => alert('Đã đồng bộ trạng thái (demo).')}>
+        <Button variant="outline" onClick={() => toast.success('Đã đồng bộ trạng thái (demo)')}>
           <RefreshCw className="h-4 w-4" /> Đồng bộ
         </Button>
       </div>
@@ -110,7 +112,7 @@ export default function SInvoice() {
                       variant="ghost"
                       size="sm"
                       disabled={!r.sInvoiceNumber}
-                      onClick={() => alert(`Tải PDF ${r.sInvoiceNumber} (demo)`)}
+                      onClick={() => toast.success(`Tải PDF ${r.sInvoiceNumber} (demo)`)}
                     >
                       <Download className="h-4 w-4" /> PDF
                     </Button>

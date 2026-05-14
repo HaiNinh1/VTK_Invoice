@@ -16,6 +16,7 @@ import {
   INVOICE_REQUESTS,
   getChecklistForServiceType,
 } from '@/data/masterData'
+import { useToast } from '@/components/ui/toast'
 
 /* -----------------------------------------------------------------------
  * Page: "Đề nghị xuất HĐ" — Form (Create + Detail/Edit)
@@ -32,6 +33,7 @@ const INVOICE_KINDS  = ['Tạo mới', 'Điều chỉnh', 'Thay thế']
 export default function DeNghiForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { toast } = useToast()
   const existing = id && id !== 'moi'
     ? INVOICE_REQUESTS.find(r => r.id === id)
     : null
@@ -75,7 +77,7 @@ export default function DeNghiForm() {
 
   function handleSubmit() {
     // Mock submit — in real app this would call API.
-    alert(`Đã gửi đề nghị ${existing?.id ?? '(mới)'} để duyệt (demo).`)
+    toast.success(`Đã gửi đề nghị ${existing?.id ?? '(mới)'} để duyệt (demo)`)
     navigate('/de-nghi')
   }
 
@@ -101,7 +103,7 @@ export default function DeNghiForm() {
         </div>
         {!readOnly && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => alert('Đã lưu nháp (demo).')}>
+            <Button variant="outline" onClick={() => toast.success('Đã lưu nháp (demo)')}>
               <Save className="h-4 w-4" /> Lưu nháp
             </Button>
             <Button onClick={handleSubmit} disabled={!contract}>

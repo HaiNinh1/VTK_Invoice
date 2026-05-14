@@ -12,6 +12,7 @@ import {
   USERS, INVOICE_TYPE_CONFIGS, ROLE_LABELS,
 } from '@/data/masterData'
 import { useRole } from '@/context/RoleContext'
+import { useToast } from '@/components/ui/toast'
 
 /* -----------------------------------------------------------------------
  * Page: "Cài đặt" — Spec: Prompt 9 + Prompt 12 + Prompt 18.
@@ -26,6 +27,7 @@ import { useRole } from '@/context/RoleContext'
 export default function CaiDat() {
   const { role, user } = useRole()
   const [tab, setTab] = useState('tai-khoan')
+  const { toast } = useToast()
 
   return (
     <div className="space-y-5">
@@ -72,7 +74,7 @@ export default function CaiDat() {
                 <Field label="Nhập lại mật khẩu mới"><Input type="password" /></Field>
               </div>
               <div className="flex justify-end">
-                <Button onClick={() => alert('Đã đổi mật khẩu (demo).')}>Cập nhật</Button>
+                <Button onClick={() => toast.success('Đã đổi mật khẩu (demo)')}>Cập nhật</Button>
               </div>
             </CardContent>
           </Card>
@@ -94,7 +96,7 @@ export default function CaiDat() {
                 </div>
                 <Button
                   variant={user.hasSignature ? 'outline' : 'default'}
-                  onClick={() => alert('Mở wizard thiết lập chữ ký số (demo).')}
+                  onClick={() => toast.info('Mở wizard thiết lập chữ ký số (demo)')}
                 >
                   {user.hasSignature ? 'Cấu hình lại' : 'Thiết lập ngay'}
                 </Button>

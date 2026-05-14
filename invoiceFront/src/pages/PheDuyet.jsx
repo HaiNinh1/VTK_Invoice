@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, XCircle, Inbox } from 'lucide-react'
+import { CheckCircle2, XCircle, Inbox, RotateCcw } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { useToast } from '@/components/ui/toast'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND, formatDate } from '@/components/shared/formatters'
 import { INVOICE_REQUESTS } from '@/data/masterData'
@@ -29,12 +35,14 @@ const TABS = {
 }
 
 export default function PheDuyet() {
-  const { role } = useRole()
-  const canApprove = role === 'accountant' || role === 'manager' || role === 'admin'
-
+  const { toast } = useToast()
   const [tab, setTab] = useState('cho-duyet')
   const [data, setData] = useState(INVOICE_REQUESTS)
   const [selectedId, setSelectedId] = useState(null)
+  const [confirmApprove, setConfirmApprove] = useState(false)
+  const [confirmReturn, setConfirmReturn] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
 
   const list = useMemo(
     () => data.filter(r => TABS[tab].includes(r.status)),
@@ -42,15 +50,30 @@ export default function PheDuyet() {
   )
   const selected = list.find(r => r.id === selectedId) ?? list[0] ?? null
 
-  function act(newStatus) {
-    if (!selected) return
-    const note = newStatus === 'Từ chối' ? prompt('Lý do từ chối:') : null
-    if (newStatus === 'Từ chối' && !note) return
+  function applyStatus(newStatus, note) {
     setData(prev => prev.map(r =>
       r.id === selected.id ? { ...r, status: newStatus } : r,
     ))
-    alert(`${selected.id}: ${newStatus}${note ? ` — ${note}` : ''} (demo).`)
+    toast.success(`${selected.id}: ${newStatus}${note ? ` — ${note}` : ''} (demo)`)
     setSelectedId(null)
+  }
+
+  function handleApprove() {
+    if (!selected) return
+    applyStatus('Đã duyệt')
+  }
+  function handleReject() {
+    if (!selected || !rejectReason.trim()) {
+      toast.warning('Vui lòng nhập lý do từ chối')
+      return
+    }
+    applyStatus('Từ chối', rejectReason.trim())
+    setRejectOpen(false)
+    setRejectReason('')
+  }
+  function handleReturn() {
+    if (!selected) return
+    applyStatus('Trả lại bổ sung')
   }
 
   return (
@@ -156,13 +179,13 @@ export default function PheDuyet() {
                 </div>
                 {canApprove && selected.status === 'Chờ duyệt' && (
                   <div className="grid grid-cols-2 gap-2 pt-2">
-                    <Button variant="outline" onClick={() => act('Trả lại bổ sung')}>
-                      Trả lại
+                    <Button variant="outline" onClick={() => setConfirmReturn(true)}>
+                      <RotateCcw className="h-4 w-4" /> Trả lại
                     </Button>
-                    <Button variant="outline" onClick={() => act('Từ chối')}>
+                    <Button variant="outline" onClick={() => setRejectOpen(true)}>
                       <XCircle className="h-4 w-4" /> Từ chối
                     </Button>
-                    <Button className="col-span-2" onClick={() => act('Đã duyệt')}>
+                    <Button className="col-span-2" onClick={() => setConfirmApprove(true)}>
                       <CheckCircle2 className="h-4 w-4" /> Duyệt
                     </Button>
                   </div>
@@ -172,6 +195,51 @@ export default function PheDuyet() {
           )}
         </aside>
       </div>
+
+      {/* Confirm: Approve */}
+      <ConfirmModal
+        open={confirmApprove}
+        onOpenChange={setConfirmApprove}
+        title="Xác nhận duyệt"
+        description={selected ? `Duyệt đề nghị ${selected.id} — ${selected.customerName}?` : ''}
+        confirmLabel="Duyệt"
+        onConfirm={handleApprove}
+      />
+
+      {/* Confirm: Return for revision */}
+      <ConfirmModal
+        open={confirmReturn}
+        onOpenChange={setConfirmReturn}
+        title="Trả lại để bổ sung"
+        description={selected ? `Yêu cầu bổ sung hồ sơ cho ${selected.id}?` : ''}
+        confirmLabel="Trả lại"
+        onConfirm={handleReturn}
+      />
+
+      {/* Reject dialog with reason */}
+      <Dialog open={rejectOpen} onOpenChange={(o) => { setRejectOpen(o); if (!o) setRejectReason('') }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Từ chối đề nghị</DialogTitle>
+            <DialogDescription>
+              {selected ? `${selected.id} — ${selected.customerName}. Vui lòng nhập lý do.` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+            placeholder="Ví dụ: Thiếu BB nghiệm thu…"
+            onKeyDown={e => { if (e.key === 'Enter') handleReject() }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectOpen(false)}>Huỷ</Button>
+            <Button variant="destructive" onClick={handleReject}>
+              <XCircle className="h-4 w-4" /> Từ chối
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

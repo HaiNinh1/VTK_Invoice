@@ -1,5 +1,15 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, AlertTriangle, Clock } from 'lucide-react'
+import {
+  ArrowRight, AlertTriangle, Clock, Download, FileSpreadsheet, TrendingUp,
+} from 'lucide-react'
+import {
+  Tabs, TabsList, TabsTrigger, TabsContent,
+} from '@/components/ui/tabs'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { useToast } from '@/components/ui/toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +36,6 @@ export default function ViecCanLam() {
 
   if (role === 'accountant') return <AccountantView />
   if (role === 'admin')      return <AccountantView />
-  return <EmployeeView user={user} departmentScope={role === 'manager'} />
 }
 
 /* ------------------------------ Helpers -------------------------------- */
@@ -209,6 +218,27 @@ function EmployeeView({ user, departmentScope }) {
 /* --------------------------- Accountant view --------------------------- */
 
 function AccountantView() {
+  return (
+    <Tabs defaultValue="queue" className="space-y-5">
+      <TabsList className="w-full justify-start sm:w-auto">
+        <TabsTrigger value="queue">
+          <Clock className="h-4 w-4" /> Hàng đợi
+        </TabsTrigger>
+        <TabsTrigger value="report">
+          <TrendingUp className="h-4 w-4" /> Báo cáo
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="queue" className="mt-0">
+        <AccountantQueue />
+      </TabsContent>
+      <TabsContent value="report" className="mt-0">
+        <AccountantReport />
+      </TabsContent>
+    </Tabs>
+  )
+}
+
+function AccountantQueue() {
   const pending = INVOICE_REQUESTS
     .filter(r => r.status === 'Chờ duyệt')
     .sort((a, b) => a.createdDate.localeCompare(b.createdDate))
@@ -299,6 +329,129 @@ function AccountantView() {
         </Section>
       )}
     </div>
+  )
+}
+
+/* --------------------------- Báo cáo tab ------------------------------ */
+
+function AccountantReport() {
+  const { toast } = useToast()
+  const months = useMemo(() => {
+    const set = new Set(INVOICE_REQUESTS.map(r => r.createdDate.slice(0, 7)))
+    return Array.from(set).sort().reverse()
+  }, [])
+  const [month, setMonth] = useState(months[0] ?? 'all')
+
+  const scoped = INVOICE_REQUESTS.filter(
+    r => month === 'all' || r.createdDate.startsWith(month),
+  )
+
+  const totalValue   = scoped.reduce((s, r) => s + r.valueAfterVAT, 0)
+  const issuedValue  = scoped
+    .filter(r => r.status === 'Đã xuất HĐ')
+    .reduce((s, r) => s + r.valueAfterVAT, 0)
+  const pendingCount = scoped.filter(r => r.status === 'Chờ duyệt').length
+  const rejectedCount = scoped.filter(r => r.status === 'Từ chối').length
+
+  // by department
+  const byDept = scoped.reduce((m, r) => {
+    const k = r.department
+    if (!m[k]) m[k] = { dept: k, count: 0, value: 0 }
+    m[k].count++
+    m[k].value += r.valueAfterVAT
+    return m
+  }, {})
+  const deptRows = Object.values(byDept).sort((a, b) => b.value - a.value)
+
+  function handleExport(format) {
+    toast.success(`Đang xuất báo cáo ${format.toUpperCase()} · ${month === 'all' ? 'Tất cả' : month} (demo)`)
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Filter bar */}
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">Kỳ báo cáo</span>
+            <Select value={month} onValueChange={setMonth}>
+              <SelectTrigger className="h-9 w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                {months.map(m => (
+                  <SelectItem key={m} value={m}>Tháng {m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={() => handleExport('excel')}>
+              <FileSpreadsheet className="h-4 w-4" /> Xuất Excel
+            </Button>
+            <Button variant="outline" onClick={() => handleExport('pdf')}>
+              <Download className="h-4 w-4" /> Xuất PDF
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* KPI tiles */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiTile label="Tổng đề nghị" value={scoped.length} />
+        <KpiTile label="Tổng giá trị" value={formatVND(totalValue, true)} />
+        <KpiTile label="Đã xuất HĐ" value={formatVND(issuedValue, true)} tone="success" />
+        <KpiTile label="Đang chờ / Từ chối" value={`${pendingCount} / ${rejectedCount}`} tone="warning" />
+      </div>
+
+      {/* By department */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Theo đơn vị</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {deptRows.length === 0 ? (
+            <p className="p-6 text-sm text-muted-foreground">Không có dữ liệu.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Đơn vị</th>
+                    <th className="px-4 py-2 text-right font-medium">Số đề nghị</th>
+                    <th className="px-4 py-2 text-right font-medium">Tổng giá trị</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {deptRows.map(r => (
+                    <tr key={r.dept} className="hover:bg-accent/30">
+                      <td className="px-4 py-2 font-medium">{r.dept}</td>
+                      <td className="px-4 py-2 text-right">{r.count}</td>
+                      <td className="px-4 py-2 text-right font-medium">{formatVND(r.value, true)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function KpiTile({ label, value, tone }) {
+  const toneClass =
+    tone === 'success' ? 'text-green-700' :
+    tone === 'warning' ? 'text-amber-700' : 'text-foreground'
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className={cn('mt-1 text-xl font-semibold', toneClass)}>{value}</div>
+      </CardContent>
+    </Card>
   )
 }
 

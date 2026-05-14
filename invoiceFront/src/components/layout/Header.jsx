@@ -1,13 +1,18 @@
-import { Bell } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import { NotificationDropdown } from '@/components/layout/NotificationDropdown'
 import { useRole } from '@/context/RoleContext'
 import { initials } from '@/components/shared/formatters'
 import { NAV_ITEMS, ROLE_LABELS } from '@/data/masterData'
+import { useToast } from '@/components/ui/toast'
+import { LogOut, User as UserIcon, Settings } from 'lucide-react'
 
 function usePageTitle() {
   const { pathname } = useLocation()
@@ -19,7 +24,14 @@ function usePageTitle() {
 
 export function Header() {
   const { role, setRole, user } = useRole()
+  const navigate = useNavigate()
+  const { toast } = useToast()
   const title = usePageTitle()
+
+  function handleLogout() {
+    toast.success('Đã đăng xuất (demo)')
+    navigate('/login')
+  }
 
   return (
     <header
@@ -43,24 +55,43 @@ export function Header() {
           </Select>
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Thông báo"
-          className="relative h-10 w-10"
-        >
-          <Bell className="h-5 w-5" />
-          <span
-            aria-hidden
-            className="absolute right-2 top-2 inline-flex h-2 w-2 rounded-full bg-primary"
-          />
-        </Button>
+        <NotificationDropdown />
 
-        <Avatar className="h-9 w-9">
-          <AvatarFallback className="bg-primary/10 text-primary">
-            {initials(user.name)}
-          </AvatarFallback>
-        </Avatar>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Tài khoản"
+              className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <Avatar className="h-9 w-9">
+                <AvatarFallback className="bg-primary/10 text-primary">
+                  {initials(user.name)}
+                </AvatarFallback>
+              </Avatar>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="font-normal">
+              <div className="text-sm font-semibold">{user.name}</div>
+              <div className="text-xs text-muted-foreground">{user.email}</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">
+                {ROLE_LABELS[role]} · {user.department}
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => navigate('/cai-dat')}>
+              <UserIcon className="h-4 w-4" /> Tài khoản
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate('/cai-dat')}>
+              <Settings className="h-4 w-4" /> Cài đặt
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={handleLogout} className="text-destructive focus:text-destructive">
+              <LogOut className="h-4 w-4" /> Đăng xuất
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   )
