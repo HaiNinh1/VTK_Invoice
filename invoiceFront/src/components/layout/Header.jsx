@@ -12,21 +12,24 @@ import { useRole } from '@/context/RoleContext'
 import { initials } from '@/components/shared/formatters'
 import { NAV_ITEMS, ROLE_LABELS } from '@/data/masterData'
 import { useToast } from '@/components/ui/toast'
-import { LogOut, User as UserIcon, Settings } from 'lucide-react'
+import { LogOut, User as UserIcon, Settings, ChevronRight } from 'lucide-react'
 
-function usePageTitle() {
+function usePageInfo() {
   const { pathname } = useLocation()
   const match = NAV_ITEMS.find(
     i => i.to === pathname || (i.to !== '/' && pathname.startsWith(i.to)),
   )
-  return match?.label ?? 'VTK Hoá đơn'
+  return {
+    title: match?.label ?? 'VTK Hóa đơn',
+    crumb: match?.label ? 'Quản lý' : null,
+  }
 }
 
 export function Header() {
   const { role, setRole, user } = useRole()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const title = usePageTitle()
+  const { title, crumb } = usePageInfo()
 
   function handleLogout() {
     toast.success('Đã đăng xuất (demo)')
@@ -35,16 +38,28 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-20 flex h-14 items-center justify-between border-b bg-card px-4 md:px-6"
+      className="sticky top-0 z-20 flex h-16 items-center justify-between bg-card/80 backdrop-blur-md px-4 md:px-8 border-b border-border"
       role="banner"
     >
-      <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+      <div className="min-w-0">
+        {crumb && (
+          <div className="hidden sm:flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-0.5">
+            <span>{crumb}</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground/70">{title}</span>
+          </div>
+        )}
+        <h1 className="text-[17px] font-semibold tracking-tight truncate">{title}</h1>
+      </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Role switcher — demo aid, spec calls it out explicitly */}
+        {/* Role switcher */}
         <div className="hidden sm:block">
           <Select value={role} onValueChange={setRole}>
-            <SelectTrigger className="h-9 w-[150px]" aria-label="Vai trò demo">
+            <SelectTrigger
+              className="h-9 w-[160px] bg-muted/50 border-border text-[13px]"
+              aria-label="Vai trò demo"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -55,6 +70,8 @@ export function Header() {
           </Select>
         </div>
 
+        <div className="h-6 w-px bg-border mx-1 hidden sm:block" />
+
         <NotificationDropdown />
 
         <DropdownMenu>
@@ -62,21 +79,24 @@ export function Header() {
             <button
               type="button"
               aria-label="Tài khoản"
-              className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-transform hover:scale-105"
             >
-              <Avatar className="h-9 w-9">
-                <AvatarFallback className="bg-primary/10 text-primary">
+              <Avatar className="h-9 w-9 ring-1 ring-border">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-[hsl(var(--gold))] text-white font-semibold text-xs">
                   {initials(user.name)}
                 </AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuLabel className="font-normal">
               <div className="text-sm font-semibold">{user.name}</div>
-              <div className="text-xs text-muted-foreground">{user.email}</div>
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                {ROLE_LABELS[role]} · {user.department}
+              <div className="text-xs text-muted-foreground mt-0.5">{user.email}</div>
+              <div className="mt-1.5 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--gold))]" />
+                <span className="text-muted-foreground">
+                  {ROLE_LABELS[role]} · {user.department}
+                </span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -87,7 +107,10 @@ export function Header() {
               <Settings className="h-4 w-4" /> Cài đặt
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={handleLogout} className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              onSelect={handleLogout}
+              className="text-destructive focus:text-destructive"
+            >
               <LogOut className="h-4 w-4" /> Đăng xuất
             </DropdownMenuItem>
           </DropdownMenuContent>

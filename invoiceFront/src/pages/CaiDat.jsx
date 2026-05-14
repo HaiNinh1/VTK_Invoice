@@ -31,7 +31,7 @@ export default function CaiDat() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-semibold">Cài đặt</h1>
+      <h1 className="text-2xl font-semibold page-title">Cài đặt</h1>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">

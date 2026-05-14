@@ -63,7 +63,7 @@ export default function DeNghi() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold">Đề nghị xuất hoá đơn</h1>
+        <h1 className="text-2xl font-semibold page-title">Đề nghị xuất hoá đơn</h1>
         <Button asChild>
           <Link to="/de-nghi/moi">
             <Plus className="h-4 w-4" /> Tạo đề nghị

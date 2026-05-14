@@ -1,45 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================
-   VTK Invoice — Design Tokens
-   Brand: Viettel Red #EE0033. White surfaces. Dark/gray text.
-   No dark mode (per spec). HSL channels for shadcn compat.
+   VTK Invoice — Design System
+   Direction: "Vietnamese cultural refinement"
+   --------------------------------------------------------------
+   - Paper background (#fdfcf8) with subtle grain overlay
+   - Lacquer black sidebar (#1c1917) with red active indicator
+   - Viettel Red primary (#EE0033) — kept exact
+   - Gold hairline accents (#a07c2f) for section dividers
+   - Be Vietnam Pro for UI body, Fraunces for display moments
+   - Tabular numerals on all currency
    ============================================================ */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222 47% 11%;          /* #111827 */
+  /* ── surfaces ──────────────────────────────────────────── */
+  --background:           42 38% 98%;     /* #fdfcf8 d\u00f3-paper */
+  --foreground:           24 10% 10%;     /* #1c1917 ink */
 
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card:                 0 0% 100%;      /* pure white cards */
+  --card-foreground:      24 10% 10%;
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover:              0 0% 100%;
+  --popover-foreground:   24 10% 10%;
 
-  --primary: 350 100% 47%;            /* #EE0033 Viettel Red */
-  --primary-foreground: 0 0% 100%;
+  /* ── brand ─────────────────────────────────────────────── */
+  --primary:              350 100% 47%;   /* #EE0033 Viettel red */
+  --primary-foreground:   0 0% 100%;
+  --primary-soft:         350 100% 96%;   /* #ffe6eb tints */
 
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222 47% 11%;
+  --gold:                 38 56% 41%;     /* #a07c2f */
+  --gold-soft:            42 65% 92%;     /* #f5ecd6 */
+  --gold-foreground:      0 0% 100%;
 
-  --muted: 220 14% 96%;               /* #F3F4F6 */
-  --muted-foreground: 220 9% 46%;     /* #6B7280 */
+  /* ── neutrals (warm stone) ─────────────────────────────── */
+  --secondary:            30 14% 95%;     /* #f5f2ed */
+  --secondary-foreground: 24 10% 15%;
 
-  --accent: 220 14% 96%;
-  --accent-foreground: 222 47% 11%;
+  --muted:                33 14% 94%;     /* #f0ece5 */
+  --muted-foreground:     25 6% 38%;      /* #6a635c */
 
-  --destructive: 0 72% 51%;
+  --accent:               33 14% 94%;
+  --accent-foreground:    24 10% 10%;
+
+  --destructive:          0 72% 45%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 220 13% 91%;              /* #E5E7EB */
-  --input: 220 13% 91%;
-  --ring: 350 100% 47%;
+  --border:               30 12% 88%;     /* #e5dfd5 */
+  --input:                30 12% 88%;
+  --ring:                 350 100% 47%;
 
-  --radius: 0.75rem;
+  --radius:               0.625rem;
 
-  --brand-tint: 350 100% 97%;         /* #FFF1F3 active sidebar bg */
+  --brand-tint:           350 100% 97%;   /* legacy alias */
+
+  /* ── sidebar (dark lacquer) ────────────────────────────── */
+  --sidebar-bg:           24 12% 9%;       /* #1a1715 */
+  --sidebar-bg-elev:      24 10% 12%;      /* hover */
+  --sidebar-fg:           30 10% 78%;      /* #cdc8c0 */
+  --sidebar-fg-muted:     25 6% 52%;       /* #8a847c */
+  --sidebar-border:       24 8% 18%;       /* dividers */
+  --sidebar-active-bg:    350 100% 47%;    /* red */
+  --sidebar-active-fg:    0 0% 100%;
+
+  /* ── elevation ─────────────────────────────────────────── */
+  --shadow-xs: 0 1px 0 0 rgb(28 25 23 / 0.03), 0 1px 2px 0 rgb(28 25 23 / 0.04);
+  --shadow-sm: 0 1px 2px 0 rgb(28 25 23 / 0.04), 0 2px 4px -2px rgb(28 25 23 / 0.04);
+  --shadow-md: 0 4px 8px -2px rgb(28 25 23 / 0.06), 0 2px 4px -2px rgb(28 25 23 / 0.04);
+  --shadow-lg: 0 12px 32px -8px rgb(28 25 23 / 0.12), 0 4px 8px -2px rgb(28 25 23 / 0.04);
 }
 
 @theme inline {
@@ -51,6 +81,10 @@
   --color-popover-foreground: hsl(var(--popover-foreground));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-soft: hsl(var(--primary-soft));
+  --color-gold: hsl(var(--gold));
+  --color-gold-soft: hsl(var(--gold-soft));
+  --color-gold-foreground: hsl(var(--gold-foreground));
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
   --color-muted: hsl(var(--muted));
@@ -64,36 +98,131 @@
   --color-ring: hsl(var(--ring));
   --color-brand-tint: hsl(var(--brand-tint));
 
+  --color-sidebar: hsl(var(--sidebar-bg));
+  --color-sidebar-elev: hsl(var(--sidebar-bg-elev));
+  --color-sidebar-foreground: hsl(var(--sidebar-fg));
+  --color-sidebar-muted: hsl(var(--sidebar-fg-muted));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-active: hsl(var(--sidebar-active-bg));
+  --color-sidebar-active-foreground: hsl(var(--sidebar-active-fg));
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
-    Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-sans:    'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Fraunces', 'Be Vietnam Pro', ui-serif, Georgia, serif;
+  --font-mono:    ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
 }
 
 @layer base {
   * {
     border-color: hsl(var(--border));
   }
-  html,
-  body,
-  #root {
+  html, body, #root {
     height: 100%;
   }
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-family: var(--font-sans);
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-feature-settings: 'ss01', 'cv11';
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 1.55;
     margin: 0;
+    /* paper grain (subtle, fixed) */
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.13  0 0 0 0 0.08  0 0 0 0.35 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.55'/></svg>");
+    background-size: 200px 200px;
+    background-attachment: fixed;
   }
   :focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
+  }
+
+  /* Numerals */
+  .tabular, .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* Currency & key figures use mono-like tabular feel */
+  .num {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Typography */
+  h1, h2, h3, h4 {
+    font-family: var(--font-sans);
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+  .font-display {
+    font-family: var(--font-display);
+    font-style: italic;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  /* Page title with gold accent under */
+  .page-title {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 0.6rem;
+  }
+  .page-title::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 2.25rem;
+    height: 2px;
+    background: hsl(var(--gold));
+    border-radius: 1px;
+  }
+
+  /* Hairline + gold helpers */
+  .border-gold { border-color: hsl(var(--gold)); }
+  .text-gold   { color: hsl(var(--gold)); }
+  .bg-gold     { background-color: hsl(var(--gold)); }
+  .bg-gold-soft{ background-color: hsl(var(--gold-soft)); }
+
+  /* Surface elevation tokens */
+  .shadow-xs   { box-shadow: var(--shadow-xs); }
+  .shadow-card { box-shadow: var(--shadow-sm); }
+  .shadow-md\! { box-shadow: var(--shadow-md); }
+  .shadow-lg\! { box-shadow: var(--shadow-lg); }
+
+  /* Red top-accent for distinguished cards */
+  .card-accent {
+    position: relative;
+  }
+  .card-accent::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--gold)) 100%);
+    border-top-left-radius: var(--radius);
+    border-top-right-radius: var(--radius);
+  }
+
+  /* Subtle brand mesh — for login hero / report header */
+  .bg-brand-mesh {
+    background:
+      radial-gradient(at 0% 0%, hsl(var(--primary) / 0.10) 0%, transparent 50%),
+      radial-gradient(at 100% 0%, hsl(var(--gold) / 0.10) 0%, transparent 50%),
+      radial-gradient(at 50% 100%, hsl(var(--primary) / 0.08) 0%, transparent 60%),
+      hsl(var(--background));
+  }
+  .bg-sidebar-mesh {
+    background:
+      radial-gradient(at 0% 0%, hsl(var(--primary) / 0.12) 0%, transparent 50%),
+      radial-gradient(at 100% 100%, hsl(var(--gold) / 0.06) 0%, transparent 60%),
+      hsl(var(--sidebar-bg));
   }
 }

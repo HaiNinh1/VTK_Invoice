@@ -81,7 +81,7 @@ export default function PheDuyet() {
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold">Phê duyệt đề nghị</h1>
+        <h1 className="text-2xl font-semibold page-title">Phê duyệt đề nghị</h1>
         {!canApprove && (
           <p className="text-sm text-muted-foreground">
             Bạn đang ở vai trò chỉ-xem. Đổi sang vai trò Kế toán/Quản lý để duyệt.

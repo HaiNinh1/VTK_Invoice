@@ -67,7 +67,7 @@ export default function HopDongDetail() {
           </Button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight">{contract.id}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight page-title">{contract.id}</h1>
               <Badge variant="muted" className="font-mono text-[11px]">
                 {contract.contractNumber}
               </Badge>

@@ -90,7 +90,7 @@ export default function DeNghiForm() {
             <Link to="/de-nghi"><ArrowLeft className="h-4 w-4" /></Link>
           </Button>
           <div>
-            <h1 className="text-xl font-semibold">
+            <h1 className="text-2xl font-semibold page-title">
               {existing ? existing.id : 'Tạo đề nghị xuất hoá đơn'}
             </h1>
             {existing && (

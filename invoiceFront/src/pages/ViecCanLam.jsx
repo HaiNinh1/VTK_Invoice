@@ -399,7 +399,7 @@ function AccountantReport() {
 
       {/* KPI tiles */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiTile label="Tổng đề nghị" value={scoped.length} />
+        <KpiTile label="Tổng đề nghị" value={scoped.length} tone="brand" />
         <KpiTile label="Tổng giá trị" value={formatVND(totalValue, true)} />
         <KpiTile label="Đã xuất HĐ" value={formatVND(issuedValue, true)} tone="success" />
         <KpiTile label="Đang chờ / Từ chối" value={`${pendingCount} / ${rejectedCount}`} tone="warning" />
@@ -416,7 +416,7 @@ function AccountantReport() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <thead className="border-b border-border bg-muted/40 text-left text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2 font-medium">Đơn vị</th>
                     <th className="px-4 py-2 text-right font-medium">Số đề nghị</th>
@@ -425,10 +425,10 @@ function AccountantReport() {
                 </thead>
                 <tbody className="divide-y">
                   {deptRows.map(r => (
-                    <tr key={r.dept} className="hover:bg-accent/30">
-                      <td className="px-4 py-2 font-medium">{r.dept}</td>
-                      <td className="px-4 py-2 text-right">{r.count}</td>
-                      <td className="px-4 py-2 text-right font-medium">{formatVND(r.value, true)}</td>
+                    <tr key={r.dept} className="transition-colors hover:bg-accent/40">
+                      <td className="px-4 py-3 font-medium">{r.dept}</td>
+                      <td className="px-4 py-3 text-right num text-muted-foreground">{r.count}</td>
+                      <td className="px-4 py-3 text-right num font-semibold">{formatVND(r.value, true)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -441,15 +441,22 @@ function AccountantReport() {
   )
 }
 
-function KpiTile({ label, value, tone }) {
+function KpiTile({ label, value, tone, delta }) {
   const toneClass =
-    tone === 'success' ? 'text-green-700' :
-    tone === 'warning' ? 'text-amber-700' : 'text-foreground'
+    tone === 'success' ? 'text-emerald-700' :
+    tone === 'warning' ? 'text-amber-700' :
+    tone === 'brand'   ? 'text-primary'    : 'text-foreground'
+  const deltaClass =
+    delta && delta.startsWith('+') ? 'text-emerald-700' :
+    delta && delta.startsWith('-') ? 'text-red-700' : 'text-muted-foreground'
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className={cn('mt-1 text-xl font-semibold', toneClass)}>{value}</div>
+    <Card accent>
+      <CardContent className="p-5">
+        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+        <div className={cn('mt-2 num text-3xl font-semibold leading-none tracking-tight', toneClass)}>{value}</div>
+        {delta && (
+          <div className={cn('mt-2 text-xs font-medium', deltaClass)}>{delta} so với kỳ trước</div>
+        )}
       </CardContent>
     </Card>
   )

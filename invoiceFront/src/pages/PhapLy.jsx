@@ -56,7 +56,7 @@ export default function PhapLy() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold">Pháp lý &amp; Hướng dẫn</h1>
+        <h1 className="text-2xl font-semibold page-title">Pháp lý &amp; Hướng dẫn</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Tổng hợp văn bản pháp luật, quy trình nội bộ và lưu ý quan trọng khi
           làm việc với hoá đơn điện tử tại Viettel Construction.
