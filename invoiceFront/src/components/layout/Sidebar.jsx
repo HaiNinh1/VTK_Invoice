@@ -28,7 +28,7 @@ export function Sidebar() {
   return (
     <aside
       aria-label="Điều hướng chính"
-      className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar-mesh text-[hsl(var(--sidebar-fg))]"
+      className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar-mesh text-[hsl(var(--sidebar-fg))] border-r border-[hsl(var(--sidebar-border))]"
     >
       {/* Brand */}
       <div className="flex h-16 items-center gap-3 px-6 border-b border-[hsl(var(--sidebar-border))]">
@@ -36,7 +36,7 @@ export function Sidebar() {
           V
         </div>
         <div className="leading-tight">
-          <div className="text-[15px] font-semibold text-white tracking-tight font-display">VTK Invoice</div>
+          <div className="text-[15px] font-semibold text-foreground tracking-tight font-display">VTK Invoice</div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-[hsl(var(--sidebar-fg-muted))]">
             Viettel Telecom
           </div>
@@ -61,7 +61,7 @@ export function Sidebar() {
                       'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-all duration-150',
                       isActive
                         ? 'bg-primary text-white shadow-sm'
-                        : 'text-[hsl(var(--sidebar-fg))] hover:bg-[hsl(var(--sidebar-bg-elev))] hover:text-white',
+                        : 'text-[hsl(var(--sidebar-fg))] hover:bg-[hsl(var(--sidebar-bg-elev))] hover:text-foreground',
                     )
                   }
                 >
@@ -70,7 +70,7 @@ export function Sidebar() {
                       <Icon
                         className={cn(
                           'h-[18px] w-[18px] transition-colors shrink-0',
-                          isActive ? 'text-white' : 'text-[hsl(var(--sidebar-fg-muted))] group-hover:text-white',
+                          isActive ? 'text-white' : 'text-[hsl(var(--sidebar-fg-muted))] group-hover:text-foreground',
                         )}
                         aria-hidden
                       />
@@ -93,7 +93,7 @@ export function Sidebar() {
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-medium leading-tight text-white">
+            <div className="truncate text-[13px] font-medium leading-tight text-foreground">
               {user.name}
             </div>
             <div className="mt-0.5 flex items-center gap-1.5">

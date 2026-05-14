@@ -5,12 +5,12 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================
-   VTK Invoice — Modern SaaS Design System (v3)
-   Direction: "Clean, indigo-accented, generous whitespace"
+   VTK Invoice — Modern SaaS Design System (v4)
+   Direction: "Light, red-accented, premium minimalism"
    --------------------------------------------------------------
-   - Cool light-gray app background (#F5F6FA), pure white cards
-   - Deep navy/slate sidebar (#1E1E2D) with indigo active pill
-   - Indigo primary (#5D5FEF) — buttons, links, active states
+   - Cool light-gray app background (#F7F7F8), pure white cards
+   - Light sidebar (white) with subtle border, dark text, red active pill
+   - True red primary (#DC2626) — buttons, links, active states
    - Soft neutral borders, near-flat single-layer shadows
    - Inter (UI) + Plus Jakarta Sans (display/headlines)
    - Rounded-xl/2xl surfaces, pill badges, tabular numerals
@@ -26,14 +26,14 @@
   --popover:              0 0% 100%;
   --popover-foreground:   222 24% 12%;
 
-  /* ── brand (indigo) ────────────────────────────────────── */
-  --primary:              239 84% 65%;     /* #5D5FEF indigo */
+  /* ── brand (true red) ──────────────────────────── */
+  --primary:              0 84% 50%;      /* #DC2626 true red */
   --primary-foreground:   0 0% 100%;
-  --primary-soft:         239 100% 96%;    /* #EEF0FF tints */
+  --primary-soft:         0 86% 97%;      /* #FEF2F2 red tint */
 
   /* ── secondary accent (kept as --gold token for back-compat,
-        repointed to a calm slate-violet so legacy usages
-        still look coherent in the new palette) ──────────── */
+        repointed to a neutral slate so legacy usages stay calm
+        and reds remain the only brand color) ─────────── */
   --gold:                 220 13% 46%;     /* #6B7280 slate */
   --gold-soft:            220 14% 96%;     /* #F1F2F6 tint */
   --gold-foreground:      0 0% 100%;
@@ -53,19 +53,19 @@
 
   --border:               220 13% 91%;     /* #E5E7EB */
   --input:                220 13% 91%;
-  --ring:                 239 84% 65%;     /* indigo focus */
+  --ring:                 0 84% 50%;      /* red focus ring */
 
   --radius:               0.75rem;          /* 12px base */
 
-  --brand-tint:           239 100% 97%;    /* legacy alias */
+  --brand-tint:           0 86% 97%;       /* legacy alias — red tint */
 
-  /* ── sidebar (dark slate) ──────────────────────────────── */
-  --sidebar-bg:           232 23% 14%;      /* #1E1E2D */
-  --sidebar-bg-elev:      230 19% 19%;      /* hover row */
-  --sidebar-fg:           220 13% 71%;      /* #A2A3B7 */
+  /* ── sidebar (LIGHT) ───────────────────────────── */
+  --sidebar-bg:           0 0% 100%;        /* white sidebar */
+  --sidebar-bg-elev:      220 14% 96%;      /* hover row #F1F2F6 */
+  --sidebar-fg:           222 16% 32%;      /* #455065 readable */
   --sidebar-fg-muted:     220 9% 50%;       /* section labels */
-  --sidebar-border:       230 17% 22%;      /* #2D2E40 */
-  --sidebar-active-bg:    239 84% 65%;      /* indigo pill */
+  --sidebar-border:       220 13% 91%;      /* #E5E7EB hairline */
+  --sidebar-active-bg:    0 84% 50%;        /* red active pill */
   --sidebar-active-fg:    0 0% 100%;
 
   /* ── elevation (whisper-soft, single layer) ───────────── */
@@ -179,7 +179,7 @@
     left: 0; bottom: 0;
     width: 2.25rem;
     height: 2px;
-    background: hsl(var(--primary));
+    background: hsl(var(--primary));     /* red underline accent */
     border-radius: 1px;
   }
 
@@ -204,7 +204,7 @@
     position: absolute;
     inset: 0 0 auto 0;
     height: 2px;
-    background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(239 84% 78%) 100%);
+    background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(0 84% 72%) 100%);
     border-top-left-radius: var(--radius);
     border-top-right-radius: var(--radius);
   }
@@ -218,9 +218,6 @@
       hsl(var(--background));
   }
   .bg-sidebar-mesh {
-    background:
-      radial-gradient(at 0% 0%, hsl(var(--primary) / 0.18) 0%, transparent 55%),
-      radial-gradient(at 100% 100%, hsl(265 84% 70% / 0.10) 0%, transparent 60%),
-      hsl(var(--sidebar-bg));
+    background: hsl(var(--sidebar-bg));   /* flat white sidebar */
   }
 }

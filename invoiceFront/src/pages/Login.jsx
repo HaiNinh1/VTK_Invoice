@@ -12,7 +12,7 @@ import { ROLE_LABELS } from '@/data/masterData'
 
 /* -----------------------------------------------------------------------
  * Login — modern two-pane layout.
- * Left  : dark slate brand panel with indigo mesh (desktop only)
+ * Left  : red brand hero panel (desktop only)
  * Right : clean white card with form
  * --------------------------------------------------------------------- */
 
@@ -45,7 +45,7 @@ export default function Login() {
   return (
     <div className="grid min-h-svh grid-cols-1 lg:grid-cols-[1.05fr_1fr]">
       {/* ─── Left: Brand hero ───────────────────────────────── */}
-      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-sidebar-mesh text-white px-12 py-10">
+      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-[hsl(0_84%_50%)] via-[hsl(0_84%_42%)] to-[hsl(0_72%_28%)] text-white px-12 py-10">
         {/* decorative grid */}
         <div
           aria-hidden
@@ -56,17 +56,17 @@ export default function Login() {
             backgroundSize: '48px 48px',
           }}
         />
-        {/* indigo glow accents */}
-        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-[hsl(var(--primary)/0.25)] blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-[hsl(265_84%_60%/0.18)] blur-3xl" />
+        {/* soft red glow accents */}
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-white/20 blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-black/20 blur-3xl" />
 
         {/* logo */}
         <div className="relative flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-xl tracking-tight shadow-lg">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-primary font-bold text-xl tracking-tight shadow-lg">
             V
           </div>
           <div className="leading-tight">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-[hsl(var(--sidebar-fg-muted))]">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-white/70">
               Viettel Telecom · 2026
             </div>
           </div>
@@ -74,17 +74,17 @@ export default function Login() {
 
         {/* headline */}
         <div className="relative max-w-md space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-white/80">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Phiên bản 2026
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-white" /> Phiên bản 2026
           </div>
           <h2 className="text-4xl font-display font-bold leading-[1.1] tracking-tight text-white">
             Quản trị hóa đơn,
             <br />
-            <span className="text-[hsl(var(--primary-soft))]">
+            <span className="text-white/85">
               tinh gọn &amp; trọn vẹn.
             </span>
           </h2>
-          <p className="text-[15px] leading-relaxed text-[hsl(var(--sidebar-fg))]">
+          <p className="text-[15px] leading-relaxed text-white/85">
             Tập trung quy trình từ hợp đồng đến S-Invoice trên một nền tảng duy nhất.
             Thiết kế cho cán bộ kế toán Viettel, vận hành nhanh, hồ sơ minh bạch.
           </p>
@@ -93,7 +93,7 @@ export default function Login() {
             {['Hợp đồng', 'Đề nghị xuất HĐ', 'Phê duyệt 3 cấp', 'S-Invoice'].map(t => (
               <span
                 key={t}
-                className="rounded-full border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-bg-elev))] px-3 py-1 text-[11px] text-[hsl(var(--sidebar-fg))]"
+                className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] text-white/90"
               >
                 {t}
               </span>
@@ -102,8 +102,8 @@ export default function Login() {
         </div>
 
         {/* footer signal */}
-        <div className="relative flex items-center gap-3 text-[11px] text-[hsl(var(--sidebar-fg-muted))]">
-          <ShieldCheck className="h-4 w-4 text-primary" />
+        <div className="relative flex items-center gap-3 text-[11px] text-white/70">
+          <ShieldCheck className="h-4 w-4 text-white" />
           Kết nối nội bộ Viettel · Mã hóa TLS 1.3 · Tuân thủ Nghị định 123/2020/NĐ-CP
         </div>
       </aside>
