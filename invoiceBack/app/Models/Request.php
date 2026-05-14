@@ -33,6 +33,8 @@ class Request extends Model
         'buyer_email', 'notes',
         'status',
         'has_commitment', 'commitment_text', 'commitment_deadline',
+        'legal_total', 'legal_checked',
+        'reject_reason', 'return_reason',
         'created_by_id',
         'submitted_at', 'recalled_at',
     ];

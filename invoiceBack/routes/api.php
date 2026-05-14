@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\ContractDocumentController;
 use App\Http\Controllers\Api\InvoiceTypeController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\RequestActionController;
+use App\Http\Controllers\Api\RequestController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,4 +38,12 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('invoice-types/{invoiceType}/groups/{group}/templates', [InvoiceTypeController::class, 'storeTemplate']);
     Route::patch('document-templates/{template}', [InvoiceTypeController::class, 'updateTemplate']);
     Route::delete('document-templates/{template}', [InvoiceTypeController::class, 'destroyTemplate']);
+
+    // Requests (invoice request lifecycle).
+    Route::apiResource('requests', RequestController::class)->parameters(['requests' => 'invoiceRequest']);
+    Route::post('requests/{invoiceRequest}/submit', [RequestActionController::class, 'submit']);
+    Route::post('requests/{invoiceRequest}/recall', [RequestActionController::class, 'recall']);
+    Route::post('requests/{invoiceRequest}/approve', [RequestActionController::class, 'approve']);
+    Route::post('requests/{invoiceRequest}/reject', [RequestActionController::class, 'reject']);
+    Route::post('requests/{invoiceRequest}/return', [RequestActionController::class, 'returnSupplement']);
 });
