@@ -36,6 +36,8 @@ const TABS = {
 
 export default function PheDuyet() {
   const { toast } = useToast()
+  const { role } = useRole()
+  const canApprove = role === 'accountant' || role === 'admin'
   const [tab, setTab] = useState('cho-duyet')
   const [data, setData] = useState(INVOICE_REQUESTS)
   const [selectedId, setSelectedId] = useState(null)
