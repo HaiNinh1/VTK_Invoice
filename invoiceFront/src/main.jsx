@@ -5,13 +5,16 @@ import './index.css'
 import App from './App.jsx'
 import { RoleProvider } from '@/context/RoleContext'
 import { ToastProvider } from '@/components/ui/toast'
+import { ContractsProvider } from '@/context/ContractsContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <RoleProvider>
         <ToastProvider>
-          <App />
+          <ContractsProvider>
+            <App />
+          </ContractsProvider>
         </ToastProvider>
       </RoleProvider>
     </BrowserRouter>

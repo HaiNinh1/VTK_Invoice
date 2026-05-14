@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/select'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND, formatDate } from '@/components/shared/formatters'
-import { CONTRACTS } from '@/data/masterData'
+import { useContracts } from '@/context/ContractsContext'
 import { cn } from '@/lib/utils'
 
 /* -----------------------------------------------------------------------
@@ -24,12 +24,13 @@ import { cn } from '@/lib/utils'
 const STATUS_FILTERS = ['Tất cả', 'Đang thực hiện', 'Đã quyết toán', 'Đã thanh lý']
 
 export default function HopDong() {
+  const { contracts } = useContracts()
   const [query,  setQuery]  = useState('')
   const [status, setStatus] = useState('Tất cả')
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return CONTRACTS.filter(c => {
+    return contracts.filter(c => {
       const matchesQuery =
         !q ||
         c.contractNumber.toLowerCase().includes(q) ||
@@ -37,7 +38,7 @@ export default function HopDong() {
       const matchesStatus = status === 'Tất cả' || c.status === status
       return matchesQuery && matchesStatus
     })
-  }, [query, status])
+  }, [contracts, query, status])
 
   return (
     <div className="space-y-5">

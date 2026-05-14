@@ -51,7 +51,7 @@ export default function DeNghiForm() {
 
   const contract = useMemo(
     () => CONTRACTS.find(c => c.id === contractId),
-    [contractId],
+    [CONTRACTS, contractId],
   )
   const checklist = useMemo(
     () => contract ? getChecklistForServiceType(contract.serviceType) : [],

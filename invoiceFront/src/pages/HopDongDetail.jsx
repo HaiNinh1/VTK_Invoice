@@ -1,7 +1,8 @@
 import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import {
   ArrowLeft, FileText, Download, Upload, Plus, Building2, Hash, Calendar,
-  Banknote, Briefcase, MapPin, FilePlus,
+  Banknote, Briefcase, MapPin, FilePlus, Pencil, Trash2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,9 @@ import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatVND, formatDate } from '@/components/shared/formatters'
-import { CONTRACTS, INVOICE_REQUESTS, getChecklistForServiceType } from '@/data/masterData'
+import { INVOICE_REQUESTS, getChecklistForServiceType } from '@/data/masterData'
+import { useContracts } from '@/context/ContractsContext'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useToast } from '@/components/ui/toast'
 
 /* -----------------------------------------------------------------------
@@ -27,7 +30,9 @@ export default function HopDongDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const contract = CONTRACTS.find(c => c.id === id)
+  const { getContract, deleteContract } = useContracts()
+  const contract = getContract(id)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   if (!contract) {
     return (
@@ -45,6 +50,7 @@ export default function HopDongDetail() {
   }
 
   const requests = INVOICE_REQUESTS.filter(r => r.contractId === contract.id)
+  const hasLinkedRequests = requests.length > 0
   const groups = getChecklistForServiceType(contract.serviceType)
   const totalDocs = contract.totalDocs
   const uploaded = contract.uploadedCount
@@ -77,14 +83,29 @@ export default function HopDongDetail() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={contract.status} />
+          <Button asChild variant="outline">
+            <Link to={`/hop-dong/${contract.id}/sua`}>
+              <Pencil className="h-4 w-4" /> Sửa thông tin
+            </Link>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setConfirmOpen(true)}
+            disabled={hasLinkedRequests}
+            title={hasLinkedRequests
+              ? 'Không thể xóa - đã có đề nghị xuất HĐ liên quan'
+              : undefined}
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive disabled:text-muted-foreground"
+          >
+            <Trash2 className="h-4 w-4" /> Xóa hợp đồng
+          </Button>
           <Button asChild>
             <Link to={`/de-nghi/moi?contract=${contract.id}`}>
               <FilePlus className="h-4 w-4" /> Tạo đề nghị xuất HĐ
             </Link>
           </Button>
-        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -256,6 +277,21 @@ export default function HopDongDetail() {
           </Card>
         </div>
       </div>
+      </div>
+
+      <ConfirmModal
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Xóa hợp đồng?"
+        description={`Hợp đồng ${contract.id} (${contract.contractNumber}) chưa có đề nghị xuất HĐ nào. Bạn có chắc muốn xóa?`}
+        confirmLabel="Xóa"
+        confirmVariant="destructive"
+        onConfirm={() => {
+          deleteContract(contract.id)
+          toast.success(`Đã xóa hợp đồng ${contract.id}`)
+          navigate('/hop-dong')
+        }}
+      />
     </div>
   )
 }

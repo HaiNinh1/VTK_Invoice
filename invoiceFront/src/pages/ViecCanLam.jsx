@@ -450,12 +450,12 @@ function KpiTile({ label, value, tone, delta }) {
     delta && delta.startsWith('+') ? 'text-emerald-700' :
     delta && delta.startsWith('-') ? 'text-red-700' : 'text-muted-foreground'
   return (
-    <Card accent>
-      <CardContent className="p-5">
+    <Card accent className="min-h-[120px]">
+      <CardContent className="flex flex-col items-center justify-center gap-2 p-5 text-center h-full">
         <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
-        <div className={cn('mt-2 num text-3xl font-semibold leading-none tracking-tight', toneClass)}>{value}</div>
+        <div className={cn('num text-3xl font-semibold leading-none tracking-tight', toneClass)}>{value}</div>
         {delta && (
-          <div className={cn('mt-2 text-xs font-medium', deltaClass)}>{delta} so với kỳ trước</div>
+          <div className={cn('text-xs font-medium', deltaClass)}>{delta} so với kỳ trước</div>
         )}
       </CardContent>
     </Card>

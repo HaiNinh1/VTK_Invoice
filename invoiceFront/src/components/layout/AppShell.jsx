@@ -23,7 +23,7 @@ export function AppShell() {
         <Header />
 
         <main className="flex-1 overflow-x-hidden pb-20 md:pb-0" role="main">
-          <div className="mx-auto w-full max-w-[1240px] px-4 py-6 md:px-8 md:py-8">
+          <div className="w-full px-6 py-6 md:px-10 md:py-8 lg:px-12">
             <Outlet />
           </div>
         </main>

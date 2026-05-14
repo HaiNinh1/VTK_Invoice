@@ -38,7 +38,7 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-20 flex h-16 items-center justify-between bg-card/90 backdrop-blur-md px-4 md:px-8 border-b border-border"
+      className="sticky top-0 z-20 flex h-16 items-center justify-between bg-card/90 backdrop-blur-md px-6 md:px-10 lg:px-12 border-b border-border"
       role="banner"
     >
       <div className="min-w-0">

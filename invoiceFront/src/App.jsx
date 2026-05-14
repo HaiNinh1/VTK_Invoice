@@ -3,6 +3,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import ViecCanLam   from '@/pages/ViecCanLam'
 import HopDong      from '@/pages/HopDong'
 import HopDongDetail from '@/pages/HopDongDetail'
+import HopDongForm  from '@/pages/HopDongForm'
 import DeNghi       from '@/pages/DeNghi'
 import DeNghiForm   from '@/pages/DeNghiForm'
 import PhapLy       from '@/pages/PhapLy'
@@ -19,8 +20,9 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/"             element={<ViecCanLam />} />
         <Route path="/hop-dong"     element={<HopDong />} />
-        <Route path="/hop-dong/moi" element={<HopDong />} />
-        <Route path="/hop-dong/:id" element={<HopDongDetail />} />
+        <Route path="/hop-dong/moi"     element={<HopDongForm />} />
+        <Route path="/hop-dong/:id"     element={<HopDongDetail />} />
+        <Route path="/hop-dong/:id/sua" element={<HopDongForm />} />
         <Route path="/de-nghi"        element={<DeNghi     />} />
         <Route path="/de-nghi/moi"    element={<DeNghiForm />} />
         <Route path="/de-nghi/:id"    element={<DeNghiForm />} />
