@@ -56,6 +56,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('notifications/{id}/read', [\App\Http\Controllers\Api\NotificationController::class, 'markRead']);
     Route::get('notification-settings', [\App\Http\Controllers\Api\NotificationController::class, 'settings']);
     Route::patch('notification-settings', [\App\Http\Controllers\Api\NotificationController::class, 'updateSettings']);
+
+    // Reports.
+    Route::get('reports/summary', [\App\Http\Controllers\Api\ReportsController::class, 'summary']);
+    Route::get('reports/contracts.xlsx', [\App\Http\Controllers\Api\ReportsController::class, 'contractsXlsx']);
+    Route::get('reports/requests.xlsx', [\App\Http\Controllers\Api\ReportsController::class, 'requestsXlsx']);
 });
 
 // Public webhook (HMAC-signed, no Sanctum).
