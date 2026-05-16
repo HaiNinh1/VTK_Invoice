@@ -61,6 +61,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('reports/summary', [\App\Http\Controllers\Api\ReportsController::class, 'summary']);
     Route::get('reports/contracts.xlsx', [\App\Http\Controllers\Api\ReportsController::class, 'contractsXlsx']);
     Route::get('reports/requests.xlsx', [\App\Http\Controllers\Api\ReportsController::class, 'requestsXlsx']);
+
+    // Settings (admin-only enforced inside controller).
+    Route::get('settings/connections', [\App\Http\Controllers\Api\SettingsController::class, 'index']);
+    Route::patch('settings/connections/s-invoice', [\App\Http\Controllers\Api\SettingsController::class, 'updateSInvoice']);
+    Route::patch('settings/connections/smtp', [\App\Http\Controllers\Api\SettingsController::class, 'updateSmtp']);
+    Route::post('settings/connections/s-invoice/test', [\App\Http\Controllers\Api\SettingsController::class, 'testSInvoice']);
+    Route::post('settings/connections/smtp/test', [\App\Http\Controllers\Api\SettingsController::class, 'testSmtp']);
 });
 
 // Public webhook (HMAC-signed, no Sanctum).
