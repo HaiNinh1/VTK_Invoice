@@ -46,6 +46,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('requests/{invoiceRequest}/approve', [RequestActionController::class, 'approve']);
     Route::post('requests/{invoiceRequest}/reject', [RequestActionController::class, 'reject']);
     Route::post('requests/{invoiceRequest}/return', [RequestActionController::class, 'returnSupplement']);
+    Route::post('requests/{invoiceRequest}/export', [\App\Http\Controllers\Api\SInvoiceController::class, 'export']);
+    Route::post('requests/{invoiceRequest}/retry-export', [\App\Http\Controllers\Api\SInvoiceController::class, 'retry']);
+
 
     // Notifications.
     Route::get('notifications', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
@@ -54,3 +57,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('notification-settings', [\App\Http\Controllers\Api\NotificationController::class, 'settings']);
     Route::patch('notification-settings', [\App\Http\Controllers\Api\NotificationController::class, 'updateSettings']);
 });
+
+// Public webhook (HMAC-signed, no Sanctum).
+Route::post('/webhooks/viettel/sinvoice', [\App\Http\Controllers\Api\ViettelWebhookController::class, 'handle']);

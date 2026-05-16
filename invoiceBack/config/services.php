@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'viettel' => [
+        // HMAC-SHA256 shared secret for inbound webhooks from Viettel S-Invoice gateway.
+        'webhook_secret' => env('VIETTEL_WEBHOOK_SECRET', 'dev-webhook-secret-change-me'),
+    ],
+
 ];

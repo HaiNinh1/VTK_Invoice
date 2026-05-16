@@ -11,6 +11,8 @@ use App\Policies\ContractPolicy;
 use App\Policies\InvoiceTypePolicy;
 use App\Policies\RequestPolicy;
 use App\Policies\UserPolicy;
+use App\Services\Viettel\FakeViettelDriver;
+use App\Services\Viettel\ViettelDriverInterface;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -19,7 +21,8 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Production swaps this binding to a real Http-based driver.
+        $this->app->bind(ViettelDriverInterface::class, FakeViettelDriver::class);
     }
 
     public function boot(): void
