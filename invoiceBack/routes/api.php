@@ -46,4 +46,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('requests/{invoiceRequest}/approve', [RequestActionController::class, 'approve']);
     Route::post('requests/{invoiceRequest}/reject', [RequestActionController::class, 'reject']);
     Route::post('requests/{invoiceRequest}/return', [RequestActionController::class, 'returnSupplement']);
+
+    // Notifications.
+    Route::get('notifications', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
+    Route::post('notifications/read-all', [\App\Http\Controllers\Api\NotificationController::class, 'markAllRead']);
+    Route::post('notifications/{id}/read', [\App\Http\Controllers\Api\NotificationController::class, 'markRead']);
+    Route::get('notification-settings', [\App\Http\Controllers\Api\NotificationController::class, 'settings']);
+    Route::patch('notification-settings', [\App\Http\Controllers\Api\NotificationController::class, 'updateSettings']);
 });

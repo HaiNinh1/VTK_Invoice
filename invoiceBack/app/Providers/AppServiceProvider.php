@@ -6,6 +6,7 @@ use App\Models\Contract;
 use App\Models\InvoiceType;
 use App\Models\Request as InvoiceRequest;
 use App\Models\User;
+use App\Observers\RequestObserver;
 use App\Policies\ContractPolicy;
 use App\Policies\InvoiceTypePolicy;
 use App\Policies\RequestPolicy;
@@ -27,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Contract::class, ContractPolicy::class);
         Gate::policy(InvoiceType::class, InvoiceTypePolicy::class);
         Gate::policy(InvoiceRequest::class, RequestPolicy::class);
+
+        InvoiceRequest::observe(RequestObserver::class);
 
         // FE-facing user codes look like "u1". Accept either "u1" or "1" in route params.
         Route::bind('user', function (string $value): User {
