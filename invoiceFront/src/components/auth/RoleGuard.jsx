@@ -1,14 +1,22 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useRole } from '@/context/RoleContext'
 
 /**
- * RoleGuard — chỉ render children nếu role hiện tại nằm trong allow list.
- * Nếu không, redirect tới /. Spec: chỉ Kế toán/QTV vào /s-invoice, /cai-dat;
- * Nhân viên/Quản lý không vào /phe-duyet.
+ * RoleGuard — combined auth + role gate.
+ *
+ * - If still hydrating the session, render nothing (avoid flash redirect).
+ * - If not authenticated, bounce to /login (preserving intended path).
+ * - If role is not in `allow`, bounce to /.
  */
 export function RoleGuard({ allow, children }) {
-  const { role } = useRole()
-  if (!allow.includes(role)) {
+  const { role, isAuthenticated, isHydrating } = useRole()
+  const location = useLocation()
+
+  if (isHydrating) return null
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  }
+  if (allow && !allow.includes(role)) {
     return <Navigate to="/" replace />
   }
   return children

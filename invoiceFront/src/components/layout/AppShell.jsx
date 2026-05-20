@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom'
 import {
   ClipboardList, FileText, FilePlus, CheckSquare, Monitor,
 } from 'lucide-react'
@@ -16,7 +16,12 @@ const MOBILE_TABS = [
 ]
 
 export function AppShell() {
-  const { role } = useRole()
+  const { role, isAuthenticated, isHydrating } = useRole()
+  const location = useLocation()
+  if (isHydrating) return null
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  }
   const visibleTabs = MOBILE_TABS.filter(t => t.roles.includes(role))
   return (
     <div className="flex h-full min-h-screen">

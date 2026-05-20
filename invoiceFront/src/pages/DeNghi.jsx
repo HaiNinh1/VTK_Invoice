@@ -97,8 +97,8 @@ export default function DeNghi() {
     'tu-choi':    allRequests.filter(r => TAB_GROUPS['tu-choi'].includes(r.status)).length,
   }), [allRequests])
 
-  function doRecall(req) {
-    const res = recallRequest(req.id, user.id)
+  async function doRecall(req) {
+    const res = await recallRequest(req.id, user.id)
     if (!res.ok) {
       toast.error(res.reason ?? 'Không thể thu hồi')
       return
@@ -112,8 +112,8 @@ export default function DeNghi() {
     toast.success(`Đã thu hồi ${req.id} — chuyển về Nháp`)
   }
 
-  function doExport(req) {
-    const res = exportRequest(req.id)
+  async function doExport(req) {
+    const res = await exportRequest(req.id)
     if (!res.ok) {
       toast.error(res.reason ?? 'Không thể xuất HĐ')
       return

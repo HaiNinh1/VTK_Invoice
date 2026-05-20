@@ -1,159 +1,128 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { CONTRACTS as SEED_CONTRACTS, totalDocsForServiceType } from '@/data/masterData'
+import { api, errorMessage } from '@/services/api'
+import { useRole } from '@/context/RoleContext'
 
 /* -----------------------------------------------------------------------
- * ContractsContext — mutable client-side store for hợp đồng.
+ * ContractsContext — server-backed store for hợp đồng.
  *
- * Why: masterData.CONTRACTS is a static seed array. To support CRUD per
- * Prompt 14 without a backend, we mirror it into React state and persist
- * to localStorage. All pages (list, detail, form, DeNghiForm dropdown)
- * read from this single source so changes propagate.
- *
- * Schema additions over the seed model (all optional, used by Prompt 14):
- *   customerRepresentative, customerEmail, customerPhone,
- *   currency ('VND' | 'USD'), notes
+ * Calls Laravel /api/contracts (+ /documents) and mirrors the response
+ * into local React state so the existing pages don't need to change
+ * their access pattern. Mutators are async and return the same shape
+ * the demo store did (id for addContract, contract for getContract…).
  * --------------------------------------------------------------------- */
-
-const STORAGE_KEY = 'vtk:contracts:v1'
 
 const ContractsContext = createContext(null)
 
-/** Load from localStorage; fall back to seed data on first run / parse error. */
-function loadInitial() {
-  if (typeof window === 'undefined') return SEED_CONTRACTS
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return SEED_CONTRACTS
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return SEED_CONTRACTS
-    return parsed
-  } catch {
-    return SEED_CONTRACTS
+function payloadFromForm(data) {
+  return {
+    contractNumber: data.contractNumber ?? '',
+    customerName: data.customerName ?? '',
+    customerTaxCode: data.customerTaxCode ?? '',
+    customerAddress: data.customerAddress ?? '',
+    customerRepresentative: data.customerRepresentative ?? null,
+    customerEmail: data.customerEmail ?? null,
+    customerPhone: data.customerPhone ?? null,
+    serviceType: data.serviceType ?? '',
+    signDate: data.signDate ?? '',
+    totalValue: Number(data.totalValue) || 0,
+    currency: data.currency ?? 'VND',
+    department: data.department ?? '',
+    status: data.status ?? 'Đang thực hiện',
+    notes: data.notes ?? null,
   }
-}
-
-/** Generate next contract id of shape HD-YYYY-NNN, unique within `list`. */
-function nextContractId(list) {
-  const year = new Date().getFullYear()
-  const prefix = `HD-${year}-`
-  let max = 0
-  for (const c of list) {
-    if (typeof c.id === 'string' && c.id.startsWith(prefix)) {
-      const n = parseInt(c.id.slice(prefix.length), 10)
-      if (Number.isFinite(n) && n > max) max = n
-    }
-  }
-  return `${prefix}${String(max + 1).padStart(3, '0')}`
 }
 
 export function ContractsProvider({ children }) {
-  const [contracts, setContracts] = useState(loadInitial)
+  const { isAuthenticated } = useRole()
+  const [contracts, setContracts] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  // Persist on every change.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
+  const reload = useCallback(async () => {
+    if (!isAuthenticated) { setContracts([]); return }
+    setLoading(true); setError(null)
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(contracts))
-    } catch {
-      /* quota / privacy mode — silently ignore for demo */
-    }
-  }, [contracts])
+      const res = await api.get('/contracts')
+      setContracts(Array.isArray(res.data?.data) ? res.data.data : [])
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally { setLoading(false) }
+  }, [isAuthenticated])
 
-  /** Add a new contract. Caller passes partial data; we fill defaults. */
-  const addContract = useCallback((data) => {
-    let createdId
-    setContracts(prev => {
-      const id = nextContractId(prev)
-      createdId = id
-      const totalDocs = totalDocsForServiceType(data.serviceType) || 0
-      const next = {
-        id,
-        contractNumber: data.contractNumber ?? '',
-        customerName: data.customerName ?? '',
-        customerTaxCode: data.customerTaxCode ?? '',
-        customerAddress: data.customerAddress ?? '',
-        customerRepresentative: data.customerRepresentative ?? '',
-        customerEmail: data.customerEmail ?? '',
-        customerPhone: data.customerPhone ?? '',
-        serviceType: data.serviceType ?? '',
-        signDate: data.signDate ?? '',
-        totalValue: Number(data.totalValue) || 0,
-        currency: data.currency ?? 'VND',
-        department: data.department ?? '',
-        status: data.status ?? 'Đang thực hiện',
-        notes: data.notes ?? '',
-        documents: [],
-        totalDocs,
-        uploadedCount: 0,
-      }
-      return [next, ...prev]
-    })
-    return createdId
+  useEffect(() => { reload() }, [reload])
+
+  const addContract = useCallback(async (data) => {
+    const res = await api.post('/contracts', payloadFromForm(data))
+    const created = res.data?.data
+    if (created) setContracts(prev => [created, ...prev.filter(c => c.id !== created.id)])
+    return created?.id
   }, [])
 
-  /** Update an existing contract by id. Partial patch; recomputes totalDocs if serviceType changes. */
-  const updateContract = useCallback((id, patch) => {
-    setContracts(prev => prev.map(c => {
-      if (c.id !== id) return c
-      const merged = { ...c, ...patch }
-      if (patch.serviceType && patch.serviceType !== c.serviceType) {
-        merged.totalDocs = totalDocsForServiceType(patch.serviceType) || 0
-      }
-      if (patch.totalValue !== undefined) {
-        merged.totalValue = Number(patch.totalValue) || 0
-      }
-      return merged
-    }))
+  const updateContract = useCallback(async (id, patch) => {
+    const res = await api.put(`/contracts/${id}`, payloadFromForm(patch))
+    const updated = res.data?.data
+    if (updated) setContracts(prev => prev.map(c => c.id === id ? updated : c))
+    return updated
   }, [])
 
-  /** Delete a contract by id. */
-  const deleteContract = useCallback((id) => {
+  const deleteContract = useCallback(async (id) => {
+    await api.delete(`/contracts/${id}`)
     setContracts(prev => prev.filter(c => c.id !== id))
   }, [])
 
-  /** Add an uploaded document to a contract. doc = {name, group, fileName, uploadDate} */
-  const addDocument = useCallback((contractId, doc) => {
+  const addDocument = useCallback(async (contractId, doc) => {
+    const form = new FormData()
+    form.append('name', doc.name ?? '')
+    form.append('group', doc.group ?? '')
+    if (doc.fileName) form.append('fileName', doc.fileName)
+    if (doc.uploadDate) form.append('uploadDate', doc.uploadDate)
+    if (doc.file instanceof File || doc.file instanceof Blob) form.append('file', doc.file)
+    const res = await api.post(`/contracts/${contractId}/documents`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const newDoc = res.data?.data
+    setContracts(prev => prev.map(c => {
+      if (c.id !== contractId || !newDoc) return c
+      const documents = [...(c.documents ?? []), newDoc]
+      return { ...c, documents, uploadedCount: documents.length }
+    }))
+    return newDoc
+  }, [])
+
+  // Kept for API compatibility; server has no PATCH doc endpoint, so we
+  // emulate locally (used only for legacy demo-time edits).
+  const updateDocument = useCallback(async (contractId, docId, patch) => {
     setContracts(prev => prev.map(c => {
       if (c.id !== contractId) return c
-      const docId = `doc-${contractId}-${Date.now()}-${Math.floor(Math.random()*1000)}`
-      const newDoc = { id: docId, ...doc }
-      const documents = [...c.documents, newDoc]
+      const documents = (c.documents ?? []).map(d => d.id === docId ? { ...d, ...patch } : d)
       return { ...c, documents, uploadedCount: documents.length }
     }))
   }, [])
 
-  /** Update an uploaded document's metadata (e.g. replace file). */
-  const updateDocument = useCallback((contractId, docId, patch) => {
+  const deleteDocument = useCallback(async (contractId, docId) => {
+    await api.delete(`/contracts/${contractId}/documents/${docId}`)
     setContracts(prev => prev.map(c => {
       if (c.id !== contractId) return c
-      const documents = c.documents.map(d => d.id === docId ? { ...d, ...patch } : d)
+      const documents = (c.documents ?? []).filter(d => d.id !== docId)
       return { ...c, documents, uploadedCount: documents.length }
     }))
   }, [])
 
-  /** Remove an uploaded document from a contract. */
-  const deleteDocument = useCallback((contractId, docId) => {
-    setContracts(prev => prev.map(c => {
-      if (c.id !== contractId) return c
-      const documents = c.documents.filter(d => d.id !== docId)
-      return { ...c, documents, uploadedCount: documents.length }
-    }))
-  }, [])
-
-  /** Look up by id (memo-friendly helper). */
   const getContract = useCallback(
     (id) => contracts.find(c => c.id === id) ?? null,
     [contracts],
   )
 
-  /** Reset to seed data (useful for demos / dev). */
-  const resetContracts = useCallback(() => {
-    setContracts(SEED_CONTRACTS)
-  }, [])
+  const resetContracts = useCallback(() => reload(), [reload])
 
   const value = useMemo(
-    () => ({ contracts, addContract, updateContract, deleteContract, addDocument, updateDocument, deleteDocument, getContract, resetContracts }),
-    [contracts, addContract, updateContract, deleteContract, addDocument, updateDocument, deleteDocument, getContract, resetContracts],
+    () => ({
+      contracts, loading, error,
+      addContract, updateContract, deleteContract,
+      addDocument, updateDocument, deleteDocument,
+      getContract, resetContracts, reload,
+    }),
+    [contracts, loading, error, addContract, updateContract, deleteContract, addDocument, updateDocument, deleteDocument, getContract, resetContracts, reload],
   )
 
   return (

@@ -1,129 +1,156 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react'
-import { INVOICE_TYPE_CONFIGS as SEED } from '@/data/masterData'
+import { api, errorMessage } from '@/services/api'
+import { useRole } from '@/context/RoleContext'
 
 /* -----------------------------------------------------------------------
- * InvoiceTypesContext — mutable client-side store for "Loại HĐ" (Prompt 12).
+ * InvoiceTypesContext — server-backed store for "Loại HĐ".
  *
- * Mirrors the static seed INVOICE_TYPE_CONFIGS into React state and persists
- * to localStorage. Supports full CRUD over invoice types and their document
- * checklists. Other pages that need the legacy export keep working — they
- * import the seed; the live data flows through this context.
+ * Wraps /api/invoice-types + /groups + /document-templates endpoints.
+ * Mutators are async; the consuming UI (CaiDat InvoiceTypesEditor)
+ * already triggers them via user actions so awaiting them is fine.
  *
- * Schema (per type):
+ * Local cache is refetched after every mutation by mapping the server
+ * response back into the cached list. The shape preserved:
  *   { id, name, serviceType, active, documentGroups: [
- *       { groupName, documents: [ { id, name, required } ] }
+ *       { id, groupName, documents: [{ id, name, required }] }
  *   ]}
  * --------------------------------------------------------------------- */
 
-const STORAGE_KEY = 'vtk:invoice-types:v1'
-
 const InvoiceTypesContext = createContext(null)
 
-function loadInitial() {
-  if (typeof window === 'undefined') return SEED
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return SEED
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : SEED
-  } catch { return SEED }
-}
-
-function uniqueDocId(prefix = 'doc') {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
-}
-
-function nextTypeId(list, hint = 'loai-hd') {
-  const base = hint.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'loai-hd'
-  if (!list.some(t => t.id === base)) return base
-  let n = 2
-  while (list.some(t => t.id === `${base}-${n}`)) n += 1
-  return `${base}-${n}`
+function replaceItem(list, item) {
+  if (!item) return list
+  const i = list.findIndex(t => t.id === item.id)
+  if (i === -1) return [...list, item]
+  const next = list.slice(); next[i] = item; return next
 }
 
 export function InvoiceTypesProvider({ children }) {
-  const [types, setTypes] = useState(loadInitial)
+  const { isAuthenticated } = useRole()
+  const [types, setTypes] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(types)) } catch { /* ignore */ }
-  }, [types])
+  const reload = useCallback(async () => {
+    if (!isAuthenticated) { setTypes([]); return }
+    setLoading(true); setError(null)
+    try {
+      const res = await api.get('/invoice-types')
+      setTypes(Array.isArray(res.data?.data) ? res.data.data : [])
+    } catch (err) { setError(errorMessage(err)) }
+    finally { setLoading(false) }
+  }, [isAuthenticated])
 
-  /** Add new invoice type. Returns the generated id. */
-  const addType = useCallback((data) => {
-    let createdId
-    setTypes(prev => {
-      const id = nextTypeId(prev, data.name)
-      createdId = id
-      return [
-        ...prev,
-        {
-          id,
-          name: data.name ?? 'Loại HĐ mới',
-          serviceType: data.serviceType ?? data.name ?? 'Khác',
-          active: data.active ?? true,
-          documentGroups: data.documentGroups ?? [
-            { groupName: 'Hồ sơ Hợp đồng', documents: [] },
-          ],
-        },
-      ]
+  useEffect(() => { reload() }, [reload])
+
+  const addType = useCallback(async (data) => {
+    const res = await api.post('/invoice-types', {
+      name: data.name,
+      serviceType: data.serviceType ?? data.name,
+      active: data.active ?? true,
     })
-    return createdId
+    const created = res.data?.data
+    if (created) setTypes(prev => [...prev, created])
+    return created?.id
   }, [])
 
-  const updateType = useCallback((id, patch) => {
-    setTypes(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t))
+  const updateType = useCallback(async (id, patch) => {
+    const res = await api.patch(`/invoice-types/${id}`, {
+      name: patch.name,
+      serviceType: patch.serviceType,
+      active: patch.active,
+    })
+    const updated = res.data?.data
+    if (updated) setTypes(prev => replaceItem(prev, updated))
+    return updated
   }, [])
 
-  const deleteType = useCallback((id) => {
+  const deleteType = useCallback(async (id) => {
+    await api.delete(`/invoice-types/${id}`)
     setTypes(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  const toggleActive = useCallback((id) => {
-    setTypes(prev => prev.map(t => t.id === id ? { ...t, active: !t.active } : t))
+  const toggleActive = useCallback(async (id) => {
+    const res = await api.post(`/invoice-types/${id}/toggle-active`)
+    const active = res.data?.active
+    setTypes(prev => prev.map(t => t.id === id ? { ...t, active: Boolean(active) } : t))
   }, [])
 
-  // -- Group + document mutations -----------------------------------------
-  const addGroup = useCallback((typeId, groupName) => {
+  // ---- Groups ----------------------------------------------------------
+  const addGroup = useCallback(async (typeId, groupName) => {
+    const res = await api.post(`/invoice-types/${typeId}/groups`, { groupName: groupName || 'Nhóm mới' })
+    const group = res.data?.data
     setTypes(prev => prev.map(t => t.id !== typeId ? t : ({
       ...t,
-      documentGroups: [
-        ...t.documentGroups,
-        { groupName: groupName || 'Nhóm mới', documents: [] },
-      ],
+      documentGroups: [...(t.documentGroups ?? []), group],
     })))
   }, [])
 
-  const renameGroup = useCallback((typeId, idx, newName) => {
-    setTypes(prev => prev.map(t => t.id !== typeId ? t : ({
-      ...t,
-      documentGroups: t.documentGroups.map((g, i) => i === idx ? { ...g, groupName: newName } : g),
-    })))
-  }, [])
+  /**
+   * renameGroup(typeId, idx, newName) — the editor passes an array index;
+   * we look up the group's server id from current state and call PATCH.
+   */
+  const renameGroup = useCallback(async (typeId, idx, newName) => {
+    let group
+    setTypes(prev => prev.map(t => {
+      if (t.id !== typeId) return t
+      const g = t.documentGroups?.[idx]
+      if (!g) return t
+      group = g
+      return {
+        ...t,
+        documentGroups: t.documentGroups.map((x, i) => i === idx ? { ...x, groupName: newName } : x),
+      }
+    }))
+    if (!group) return
+    try {
+      await api.patch(`/invoice-types/${typeId}/groups/${group.id}`, { groupName: newName })
+    } catch (err) {
+      await reload()
+      throw err
+    }
+  }, [reload])
 
-  const deleteGroup = useCallback((typeId, idx) => {
-    setTypes(prev => prev.map(t => t.id !== typeId ? t : ({
-      ...t,
-      documentGroups: t.documentGroups.filter((_, i) => i !== idx),
-    })))
-  }, [])
+  const deleteGroup = useCallback(async (typeId, idx) => {
+    let groupId
+    setTypes(prev => prev.map(t => {
+      if (t.id !== typeId) return t
+      const g = t.documentGroups?.[idx]; if (!g) return t
+      groupId = g.id
+      return { ...t, documentGroups: t.documentGroups.filter((_, i) => i !== idx) }
+    }))
+    if (!groupId) return
+    try { await api.delete(`/invoice-types/${typeId}/groups/${groupId}`) }
+    catch (err) { await reload(); throw err }
+  }, [reload])
 
-  const addDocument = useCallback((typeId, groupIdx, doc) => {
+  // ---- Templates -------------------------------------------------------
+  const addDocument = useCallback(async (typeId, groupIdx, doc) => {
+    const current = types.find(t => t.id === typeId)
+    const group = current?.documentGroups?.[groupIdx]
+    if (!group) return
+    const res = await api.post(`/invoice-types/${typeId}/groups/${group.id}/templates`, {
+      name: doc?.name ?? 'Tài liệu mới',
+      required: doc?.required ?? true,
+    })
+    const template = res.data?.data
     setTypes(prev => prev.map(t => t.id !== typeId ? t : ({
       ...t,
       documentGroups: t.documentGroups.map((g, i) => i !== groupIdx ? g : ({
         ...g,
-        documents: [
-          ...g.documents,
-          { id: uniqueDocId(), name: doc?.name ?? 'Tài liệu mới', required: doc?.required ?? true },
-        ],
+        documents: [...(g.documents ?? []), template],
       })),
     })))
-  }, [])
+  }, [types])
 
-  const updateDocument = useCallback((typeId, groupIdx, docId, patch) => {
+  const updateDocument = useCallback(async (typeId, groupIdx, docId, patch) => {
+    // Numeric _id is the DB primary key (when available); fall back to id.
+    const current = types.find(t => t.id === typeId)
+    const group = current?.documentGroups?.[groupIdx]
+    const doc = group?.documents?.find(d => d.id === docId)
+    const dbId = doc?._id ?? docId
     setTypes(prev => prev.map(t => t.id !== typeId ? t : ({
       ...t,
       documentGroups: t.documentGroups.map((g, i) => i !== groupIdx ? g : ({
@@ -131,9 +158,15 @@ export function InvoiceTypesProvider({ children }) {
         documents: g.documents.map(d => d.id === docId ? { ...d, ...patch } : d),
       })),
     })))
-  }, [])
+    try { await api.patch(`/document-templates/${dbId}`, patch) }
+    catch (err) { await reload(); throw err }
+  }, [types, reload])
 
-  const deleteDocument = useCallback((typeId, groupIdx, docId) => {
+  const deleteDocument = useCallback(async (typeId, groupIdx, docId) => {
+    const current = types.find(t => t.id === typeId)
+    const group = current?.documentGroups?.[groupIdx]
+    const doc = group?.documents?.find(d => d.id === docId)
+    const dbId = doc?._id ?? docId
     setTypes(prev => prev.map(t => t.id !== typeId ? t : ({
       ...t,
       documentGroups: t.documentGroups.map((g, i) => i !== groupIdx ? g : ({
@@ -141,14 +174,16 @@ export function InvoiceTypesProvider({ children }) {
         documents: g.documents.filter(d => d.id !== docId),
       })),
     })))
-  }, [])
+    try { await api.delete(`/document-templates/${dbId}`) }
+    catch (err) { await reload(); throw err }
+  }, [types, reload])
 
   const value = useMemo(() => ({
-    types,
+    types, loading, error, reload,
     addType, updateType, deleteType, toggleActive,
     addGroup, renameGroup, deleteGroup,
     addDocument, updateDocument, deleteDocument,
-  }), [types, addType, updateType, deleteType, toggleActive, addGroup, renameGroup, deleteGroup, addDocument, updateDocument, deleteDocument])
+  }), [types, loading, error, reload, addType, updateType, deleteType, toggleActive, addGroup, renameGroup, deleteGroup, addDocument, updateDocument, deleteDocument])
 
   return (
     <InvoiceTypesContext.Provider value={value}>

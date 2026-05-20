@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ShieldCheck, KeyRound, FileCog, Users, Bell, Plus, Pencil, Trash2,
   Check, X as XIcon, ToggleLeft, ToggleRight, Plug, Server, Mail,
@@ -17,6 +17,7 @@ import { useRole } from '@/context/RoleContext'
 import { useToast } from '@/components/ui/toast'
 import { useInvoiceTypes } from '@/context/InvoiceTypesContext'
 import { useNotifications } from '@/context/NotificationsContext'
+import { api, errorMessage } from '@/services/api'
 import { cn } from '@/lib/utils'
 
 /* -----------------------------------------------------------------------
@@ -216,13 +217,15 @@ function InvoiceTypesEditor() {
   }
   const selected = types.find(t => t.id === selectedId) ?? null
 
-  function handleAddType() {
+  async function handleAddType() {
     const name = window.prompt('Tên loại HĐ mới:')?.trim()
     if (!name) return
     const serviceType = window.prompt('Loại dịch vụ (mã ngắn):', name)?.trim() || name
-    const id = addType({ name, serviceType })
-    setSelectedId(id)
-    toast.success(`Đã thêm "${name}"`)
+    try {
+      const id = await addType({ name, serviceType })
+      setSelectedId(id)
+      toast.success(`Đã thêm "${name}"`)
+    } catch { toast.error('Không thêm được loại HĐ') }
   }
 
   function handleRenameType(t) {
@@ -536,32 +539,92 @@ function ConnectionsTab() {
   const { toast } = useToast()
   const [sInvoiceStatus, setSInvoiceStatus] = useState({ state: 'unknown', message: '' })
   const [smtpStatus, setSmtpStatus] = useState({ state: 'unknown', message: '' })
+  const [loading, setLoading] = useState(true)
   const [sInvoiceForm, setSInvoiceForm] = useState({
-    endpoint: 'https://api-vinvoice.viettel.vn',
-    taxCode: '0100109106',
-    username: 'vtk-prod',
+    endpoint: '', taxCode: '', username: '', apiSecret: '', hasApiSecret: false,
   })
   const [smtpForm, setSmtpForm] = useState({
-    host: 'smtp.viettel.com.vn',
-    port: '465',
-    username: 'no-reply@vtk.vn',
-    from: 'VTK Hoá đơn <no-reply@vtk.vn>',
+    host: '', port: '', username: '', password: '', from: '', hasPassword: false,
   })
+  const [savingSInvoice, setSavingSInvoice] = useState(false)
+  const [savingSmtp, setSavingSmtp] = useState(false)
+  const [smtpTestTo, setSmtpTestTo] = useState('')
 
-  function testSInvoice() {
-    setSInvoiceStatus({ state: 'testing', message: 'Đang gửi gói kiểm tra...' })
-    setTimeout(() => {
-      setSInvoiceStatus({ state: 'ok', message: `Kết nối thành công · MST ${sInvoiceForm.taxCode}` })
-      toast.success('Cổng S-Invoice phản hồi OK')
-    }, 700)
+  useEffect(() => {
+    let cancelled = false
+    api.get('/settings/connections').then(res => {
+      if (cancelled) return
+      const d = res.data?.data ?? {}
+      if (d.sInvoice) setSInvoiceForm(prev => ({ ...prev, ...d.sInvoice, apiSecret: '' }))
+      if (d.smtp) setSmtpForm(prev => ({ ...prev, ...d.smtp, password: '' }))
+    }).catch(err => toast.error(errorMessage(err, 'Không tải được cấu hình')))
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [toast])
+
+  async function saveSInvoice() {
+    setSavingSInvoice(true)
+    try {
+      const payload = {
+        endpoint: sInvoiceForm.endpoint,
+        taxCode: sInvoiceForm.taxCode,
+        username: sInvoiceForm.username,
+      }
+      if (sInvoiceForm.apiSecret) payload.apiSecret = sInvoiceForm.apiSecret
+      const res = await api.patch('/settings/connections/s-invoice', payload)
+      const d = res.data?.data
+      if (d) setSInvoiceForm(prev => ({ ...prev, ...d, apiSecret: '' }))
+      toast.success('Đã lưu cấu hình S-Invoice')
+    } catch (err) { toast.error(errorMessage(err, 'Lưu cấu hình thất bại')) }
+    finally { setSavingSInvoice(false) }
   }
 
-  function testSmtp() {
+  async function saveSmtp() {
+    setSavingSmtp(true)
+    try {
+      const payload = {
+        host: smtpForm.host, port: smtpForm.port,
+        username: smtpForm.username, from: smtpForm.from,
+      }
+      if (smtpForm.password) payload.password = smtpForm.password
+      const res = await api.patch('/settings/connections/smtp', payload)
+      const d = res.data?.data
+      if (d) setSmtpForm(prev => ({ ...prev, ...d, password: '' }))
+      toast.success('Đã lưu cấu hình SMTP')
+    } catch (err) { toast.error(errorMessage(err, 'Lưu cấu hình thất bại')) }
+    finally { setSavingSmtp(false) }
+  }
+
+  async function testSInvoice() {
+    setSInvoiceStatus({ state: 'testing', message: 'Đang gửi gói kiểm tra...' })
+    try {
+      const res = await api.post('/settings/connections/s-invoice/test')
+      setSInvoiceStatus({ state: 'ok', message: res.data?.message ?? 'Kết nối thành công' })
+      toast.success('Cổng S-Invoice phản hồi OK')
+    } catch (err) {
+      const msg = errorMessage(err, 'Kết nối thất bại')
+      setSInvoiceStatus({ state: 'error', message: msg })
+      toast.error(msg)
+    }
+  }
+
+  async function testSmtp() {
+    const to = (smtpTestTo || smtpForm.username || '').trim()
+    if (!to) { toast.error('Nhập email để gửi thử'); return }
     setSmtpStatus({ state: 'testing', message: 'Đang gửi email test...' })
-    setTimeout(() => {
-      setSmtpStatus({ state: 'ok', message: `Đã gửi mail test tới ${smtpForm.username}` })
+    try {
+      const res = await api.post('/settings/connections/smtp/test', { to })
+      setSmtpStatus({ state: 'ok', message: res.data?.message ?? `Đã gửi mail test tới ${to}` })
       toast.success('SMTP phản hồi OK')
-    }, 700)
+    } catch (err) {
+      const msg = errorMessage(err, 'Gửi thử thất bại')
+      setSmtpStatus({ state: 'error', message: msg })
+      toast.error(msg)
+    }
+  }
+
+  if (loading) {
+    return <Card><CardContent className="p-6 text-sm text-muted-foreground">Đang tải cấu hình…</CardContent></Card>
   }
 
   return (
@@ -576,16 +639,19 @@ function ConnectionsTab() {
           </div>
           <div className="grid gap-3">
             <Field label="Endpoint">
-              <Input value={sInvoiceForm.endpoint} onChange={e => setSInvoiceForm({ ...sInvoiceForm, endpoint: e.target.value })} />
+              <Input value={sInvoiceForm.endpoint ?? ''} onChange={e => setSInvoiceForm({ ...sInvoiceForm, endpoint: e.target.value })} />
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="MST đơn vị">
-                <Input value={sInvoiceForm.taxCode} onChange={e => setSInvoiceForm({ ...sInvoiceForm, taxCode: e.target.value })} />
+                <Input value={sInvoiceForm.taxCode ?? ''} onChange={e => setSInvoiceForm({ ...sInvoiceForm, taxCode: e.target.value })} />
               </Field>
               <Field label="Tài khoản API">
-                <Input value={sInvoiceForm.username} onChange={e => setSInvoiceForm({ ...sInvoiceForm, username: e.target.value })} />
+                <Input value={sInvoiceForm.username ?? ''} onChange={e => setSInvoiceForm({ ...sInvoiceForm, username: e.target.value })} />
               </Field>
             </div>
+            <Field label={sInvoiceForm.hasApiSecret ? 'API Secret (để trống = giữ nguyên)' : 'API Secret'}>
+              <Input type="password" value={sInvoiceForm.apiSecret ?? ''} onChange={e => setSInvoiceForm({ ...sInvoiceForm, apiSecret: e.target.value })} placeholder={sInvoiceForm.hasApiSecret ? '••••••••' : ''} />
+            </Field>
             {sInvoiceStatus.message && (
               <div className={cn('rounded-md border px-3 py-2 text-xs',
                 sInvoiceStatus.state === 'ok' ? 'border-green-200 bg-green-50 text-green-800' :
@@ -597,7 +663,7 @@ function ConnectionsTab() {
             )}
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => toast.success('Đã lưu cấu hình (demo)')}>Lưu</Button>
+            <Button variant="outline" onClick={saveSInvoice} disabled={savingSInvoice}>{savingSInvoice ? 'Đang lưu…' : 'Lưu'}</Button>
             <Button onClick={testSInvoice} disabled={sInvoiceStatus.state === 'testing'}>
               <Plug className="h-4 w-4" /> {sInvoiceStatus.state === 'testing' ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}
             </Button>
@@ -616,17 +682,23 @@ function ConnectionsTab() {
           <div className="grid gap-3">
             <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
               <Field label="SMTP Host">
-                <Input value={smtpForm.host} onChange={e => setSmtpForm({ ...smtpForm, host: e.target.value })} />
+                <Input value={smtpForm.host ?? ''} onChange={e => setSmtpForm({ ...smtpForm, host: e.target.value })} />
               </Field>
               <Field label="Port">
-                <Input value={smtpForm.port} onChange={e => setSmtpForm({ ...smtpForm, port: e.target.value })} />
+                <Input value={smtpForm.port ?? ''} onChange={e => setSmtpForm({ ...smtpForm, port: e.target.value })} />
               </Field>
             </div>
             <Field label="Tài khoản">
-              <Input value={smtpForm.username} onChange={e => setSmtpForm({ ...smtpForm, username: e.target.value })} />
+              <Input value={smtpForm.username ?? ''} onChange={e => setSmtpForm({ ...smtpForm, username: e.target.value })} />
+            </Field>
+            <Field label={smtpForm.hasPassword ? 'Mật khẩu (để trống = giữ nguyên)' : 'Mật khẩu'}>
+              <Input type="password" value={smtpForm.password ?? ''} onChange={e => setSmtpForm({ ...smtpForm, password: e.target.value })} placeholder={smtpForm.hasPassword ? '••••••••' : ''} />
             </Field>
             <Field label="From">
-              <Input value={smtpForm.from} onChange={e => setSmtpForm({ ...smtpForm, from: e.target.value })} />
+              <Input value={smtpForm.from ?? ''} onChange={e => setSmtpForm({ ...smtpForm, from: e.target.value })} />
+            </Field>
+            <Field label="Gửi mail test tới">
+              <Input type="email" value={smtpTestTo} onChange={e => setSmtpTestTo(e.target.value)} placeholder="vd: ban@vtk.vn" />
             </Field>
             {smtpStatus.message && (
               <div className={cn('rounded-md border px-3 py-2 text-xs',
@@ -639,7 +711,7 @@ function ConnectionsTab() {
             )}
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => toast.success('Đã lưu cấu hình (demo)')}>Lưu</Button>
+            <Button variant="outline" onClick={saveSmtp} disabled={savingSmtp}>{savingSmtp ? 'Đang lưu…' : 'Lưu'}</Button>
             <Button onClick={testSmtp} disabled={smtpStatus.state === 'testing'}>
               <Mail className="h-4 w-4" /> {smtpStatus.state === 'testing' ? 'Đang gửi...' : 'Gửi mail test'}
             </Button>

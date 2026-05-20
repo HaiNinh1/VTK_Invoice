@@ -26,15 +26,19 @@ function usePageInfo() {
 }
 
 export function Header() {
-  const { role, setRole, user } = useRole()
+  const { role, user, logout } = useRole()
   const navigate = useNavigate()
   const { toast } = useToast()
   const { title, crumb } = usePageInfo()
 
-  function handleLogout() {
-    toast.success('Đã đăng xuất (demo)')
-    navigate('/login')
+  async function handleLogout() {
+    await logout()
+    toast.success('Đã đăng xuất')
+    navigate('/login', { replace: true })
   }
+
+
+
 
   return (
     <header
@@ -53,21 +57,10 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Role switcher */}
-        <div className="hidden sm:block">
-          <Select value={role} onValueChange={setRole}>
-            <SelectTrigger
-              className="h-9 w-[160px] bg-muted/50 border-border text-[13px]"
-              aria-label="Vai trò demo"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(ROLE_LABELS).map(([k, label]) => (
-                <SelectItem key={k} value={k}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Brand label (role switcher removed under real auth) */}
+        <div className="hidden sm:flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          <span>{ROLE_LABELS[role]} · {user?.department}</span>
         </div>
 
         <div className="h-6 w-px bg-border mx-1 hidden sm:block" />

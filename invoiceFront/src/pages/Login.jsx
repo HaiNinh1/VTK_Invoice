@@ -1,59 +1,58 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import { useRole } from '@/context/RoleContext'
 import { useToast } from '@/components/ui/toast'
-import { ROLE_LABELS, CURRENT_USER_BY_ROLE } from '@/data/masterData'
+import { errorMessage } from '@/services/api'
 
 /* -----------------------------------------------------------------------
- * Login — modern two-pane layout.
- * Left  : red brand hero panel (desktop only)
- * Right : clean white card with form
+ * Login — real Sanctum bearer-token authentication.
+ * POST /api/auth/login → stores token, hydrates user, redirects.
  * --------------------------------------------------------------------- */
 
 export default function Login() {
-  const { setRole } = useRole()
+  const { login, isAuthenticated } = useRole()
   const navigate = useNavigate()
   const { state } = useLocation()
   const { toast } = useToast()
 
-  const [username, setUsername] = useState('demo')
-  const [password, setPassword] = useState('demo1234')
-  const [role, setRoleLocal] = useState('accountant')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e) {
+  if (isAuthenticated) {
+    return <Navigate to={state?.from ?? '/'} replace />
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault()
-    if (!username || !password) {
-      toast.error('Vui lòng nhập tài khoản và mật khẩu')
+    if (!email || !password) {
+      toast.error('Vui lòng nhập email và mật khẩu')
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      setRole(role)
-      const u = CURRENT_USER_BY_ROLE[role]
-      const profile = JSON.parse(window.localStorage.getItem('vtk:profile:v1') || '{}')
-      const hasSig = profile.hasSignature ?? u?.hasSignature ?? false
-      toast.success(`Đăng nhập thành công · ${ROLE_LABELS[role]}`)
-      if (!hasSig) {
+    try {
+      const { user } = await login(email.trim(), password)
+      toast.success(`Đăng nhập thành công · ${user.roleLabel}`)
+      if (!user.hasSignature) {
         navigate('/ho-so-ca-nhan?setup=signature', { replace: true })
       } else {
         navigate(state?.from ?? '/', { replace: true })
       }
-    }, 350)
+    } catch (err) {
+      toast.error(errorMessage(err, 'Email hoặc mật khẩu không đúng'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <div className="grid min-h-svh grid-cols-1 lg:grid-cols-[1.05fr_1fr]">
       {/* ─── Left: Brand hero ───────────────────────────────── */}
       <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-[hsl(0_84%_50%)] via-[hsl(0_84%_42%)] to-[hsl(0_72%_28%)] text-white px-12 py-10">
-        {/* decorative grid */}
         <div
           aria-hidden
           className="absolute inset-0 opacity-[0.04]"
@@ -63,23 +62,20 @@ export default function Login() {
             backgroundSize: '48px 48px',
           }}
         />
-        {/* soft red glow accents */}
         <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-white/20 blur-3xl" />
         <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-black/20 blur-3xl" />
 
-        {/* logo */}
         <div className="relative flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-primary font-bold text-xl tracking-tight shadow-lg">
             V
           </div>
           <div className="leading-tight">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-white/70">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/70">
               Viettel Telecom · 2026
             </div>
           </div>
         </div>
 
-        {/* headline */}
         <div className="relative max-w-md space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-white">
             <span className="h-1.5 w-1.5 rounded-full bg-white" /> Phiên bản 2026
@@ -108,7 +104,6 @@ export default function Login() {
           </div>
         </div>
 
-        {/* footer signal */}
         <div className="relative flex items-center gap-3 text-[11px] text-white/70">
           <ShieldCheck className="h-4 w-4 text-white" />
           Kết nối nội bộ Viettel · Mã hóa TLS 1.3 · Tuân thủ Nghị định 123/2020/NĐ-CP
@@ -118,7 +113,6 @@ export default function Login() {
       {/* ─── Right: Form ────────────────────────────────────── */}
       <main className="flex flex-col items-center justify-center px-6 py-10 lg:px-16">
         <div className="w-full max-w-sm">
-          {/* mobile brand */}
           <div className="lg:hidden mb-8 flex items-center justify-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-lg shadow-sm">
               V
@@ -141,18 +135,19 @@ export default function Login() {
               <span className="text-primary">trở lại làm việc.</span>
             </h1>
             <p className="mt-3 text-sm text-muted-foreground">
-              Phiên bản demo — chọn vai trò bên dưới để xem giao diện tương ứng.
+              Nhập email Viettel và mật khẩu để tiếp tục.
             </p>
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
-            <Field label="Tài khoản" htmlFor="username">
+            <Field label="Email" htmlFor="email">
               <Input
-                id="username"
+                id="email"
+                type="email"
                 autoComplete="username"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                placeholder="vd: an.nv"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="vd: an.nv@viettel.vn"
                 disabled={loading}
               />
             </Field>
@@ -177,19 +172,6 @@ export default function Login() {
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-            </Field>
-
-            <Field label="Vai trò (demo)" htmlFor="role">
-              <Select value={role} onValueChange={setRoleLocal}>
-                <SelectTrigger id="role" disabled={loading}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(ROLE_LABELS).map(([k, label]) => (
-                    <SelectItem key={k} value={k}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </Field>
 
             <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
@@ -219,7 +201,7 @@ export default function Login() {
           </p>
 
           <p className="mt-10 text-center text-[11px] text-muted-foreground">
-            © {new Date().getFullYear()} Viettel Construction · Demo build
+            © {new Date().getFullYear()} Viettel Construction
           </p>
         </div>
       </main>

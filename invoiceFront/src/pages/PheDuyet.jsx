@@ -77,13 +77,13 @@ export default function PheDuyet() {
     setApprovalNote('')
   }
 
-  function handleApprove() {
+  async function handleApprove() {
     if (!selected) return
     if (!accountingRefNo.trim()) {
       toast.warning('Vui lòng nhập số chứng từ ghi sổ')
       return
     }
-    const res = approveRequest(selected.id, {
+    const res = await approveRequest(selected.id, {
       approvedBy: user?.name ?? 'Kế toán',
       approvedById: user?.id ?? null,
       accountingRefNo: accountingRefNo.trim(),
@@ -108,12 +108,12 @@ export default function PheDuyet() {
     setSelectedId(null)
   }
 
-  function handleReject() {
+  async function handleReject() {
     if (!selected || !rejectReason.trim()) {
       toast.warning('Vui lòng nhập lý do từ chối')
       return
     }
-    const res = rejectRequest(selected.id, rejectReason.trim())
+    const res = await rejectRequest(selected.id, rejectReason.trim())
     if (!res.ok) {
       toast.error(res.reason ?? 'Không thể từ chối')
       return
@@ -130,12 +130,12 @@ export default function PheDuyet() {
     setSelectedId(null)
   }
 
-  function handleReturn() {
+  async function handleReturn() {
     if (!selected || !returnReason.trim()) {
       toast.warning('Vui lòng nhập lý do trả lại')
       return
     }
-    const res = returnRequest(selected.id, returnReason.trim())
+    const res = await returnRequest(selected.id, returnReason.trim())
     if (!res.ok) {
       toast.error(res.reason ?? 'Không thể trả lại')
       return

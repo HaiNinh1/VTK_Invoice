@@ -106,7 +106,7 @@ export default function HopDongForm() {
     if (errors[name]) setErrors(e => { const n = { ...e }; delete n[name]; return n })
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e?.preventDefault?.()
     const errs = validate(form)
     if (duplicateNumber) errs.contractNumber = 'Số hợp đồng đã tồn tại'
@@ -118,14 +118,17 @@ export default function HopDongForm() {
     setSubmitting(true)
     try {
       if (isEdit) {
-        updateContract(existing.id, form)
+        await updateContract(existing.id, form)
         toast.success(`Đã cập nhật hợp đồng ${existing.id}`)
         navigate(`/hop-dong/${existing.id}`)
       } else {
-        const newId = addContract(form)
+        const newId = await addContract(form)
         toast.success(`Đã tạo hợp đồng ${newId}`)
         navigate(`/hop-dong/${newId}`)
       }
+    } catch (err) {
+      const { errorMessage } = await import('@/services/api')
+      toast.error(errorMessage(err, 'Lưu hợp đồng thất bại'))
     } finally {
       setSubmitting(false)
     }
